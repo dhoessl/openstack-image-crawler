@@ -5,97 +5,71 @@ from loguru import logger
 from pathlib import Path
 
 
-def database_connect(name):
-    path = Path(name)
-    if path.is_file():
-        try:
-            connection = sqlite3.connect(name)
-        except sqlite3.OperationalError as error:
-            logger.error(error)
-            return None
-        return connection
-    else:
+def database_connect(
+    database_path: str, init: bool = False
+) -> sqlite3.Connection:
+    path = Path(database_path)
+    if not path.is_file():
+        logger.error("Database at {path} not found")
         return None
+    try:
+        connection = sqlite3.connect(path)
+    except sqlite3.OperationalError as error:
+        logger.error(f"Databse OperationalError\n{error}")
+        return None
+    return connection
 
 
-def database_disconnect(connection):
+def database_disconnect(connection: sqlite3.Connection) -> None:
     connection.close()
 
 
-def database_initialize(name, prog_dirname):
-    path = Path(name)
+def database_initialize(database_path: str, prog_dirname: str) -> None:
+    path = Path(database_path)
     if path.is_file():
-        logger.warning("database %s already exists. Cowardly refusing action." % name)
-    else:
-        create_statement_fqfn = prog_dirname + "/lib/initialize-image-catalog.sql"
-        create_statement_file_path = Path(create_statement_fqfn)
-        if create_statement_file_path.is_file():
-            db_init_file = open(create_statement_fqfn)
-            create_statement = db_init_file.read()
-            db_init_file.close()
-        else:
-            logger.error("Template initialize-image-catalog.sql not found")
-            raise SystemExit(1)
-
-        try:
-            connection = sqlite3.connect(name)
-        except sqlite3.OperationalError as error:
-            logger.error(error)
-        database_cursor = connection.cursor()
-        try:
-            database_cursor.execute(create_statement)
-        except Exception as error:
-            logger.error('create table failed with the following error "%s"' % error)
-
-        connection.close()
-        logger.info("New database created under %s" % name)
-
-# def db_get_last_checksum_fedora(connection, distribution):
-#     try:
-#         database_cursor = connection.cursor()
-#         database_cursor.execute(
-#             "SELECT checksum FROM image_catalog "
-#             "WHERE distribution_name = '%s' "
-#             "ORDER BY id DESC LIMIT 1" % distribution
-#         )
-#     except sqlite3.OperationalError as error:
-#         logger.error(error)
-#         raise SystemExit(1)
-
-#     row = database_cursor.fetchone()
-
-#     if row is None:
-#         logger.debug("no previous entries found")
-#         last_checksum = "sha256:none"
-#     else:
-#         last_checksum = row[0]
-
-#     database_cursor.close()
-
-#     return last_checksum
-
-def db_get_last_checksum(connection, distribution, release):
+        logger.warning(f"database {path} already exists. Refusing action.")
+        return None
+    create_statement_file_path = Path(
+        f"{prog_dirname}/lib/initialize-image-catalog.sql"
+    )
+    if not create_statement_file_path.is_file():
+        logger.error("Template initialize-image-catalog.sql not found")
+        raise SystemExit(1)
+    db_init_file = open(create_statement_file_path)
+    create_statement = db_init_file.read()
+    db_init_file.close()
+    connection = database_connect(path, init=True)
     try:
         database_cursor = connection.cursor()
-        if release == "all":
-            database_cursor.execute(
-                "SELECT checksum FROM image_catalog "
-                "WHERE distribution_name = '%s' "
-                "ORDER BY id DESC LIMIT 1" % distribution
-            )
-        else:
-            database_cursor.execute(
-                "SELECT checksum FROM image_catalog "
-                "WHERE distribution_name = '%s' "
-                "AND distribution_release = '%s' "
-                "ORDER BY id DESC LIMIT 1" % (distribution, release)
-            )
+        database_cursor.execute(create_statement)
+    except Exception as error:
+        logger.error(f"Create table failed!\n{error}")
+    database_disconnect(connection)
+    logger.info(f"New database created under {path}")
+
+
+def db_get_last_checksum(
+    connection: sqlite3.Connection, distribution: str, release: str
+) -> str:
+    if release == "all":
+        call = f"SELECT checksum FROM image_catalog \
+            WHERE distribution_name = '{distribution}' \
+            ORDER BY id DESC LIMIT 1"
+    else:
+        call = f"SELECT checksum FROM image_catalog \
+            WHERE distribution_name = '{distribution}' \
+            AND distribution_release = '{release}' \
+            ORDER BY id DESC LIMIT 1"
+    try:
+        database_cursor = connection.cursor()
+        database_cursor.execute(call)
     except sqlite3.OperationalError as error:
-        logger.error(error)
+        logger.error(
+            f"Database OperationalError while fetching checksum\n{error}"
+        )
         raise SystemExit(1)
 
     row = database_cursor.fetchone()
-
     if row is None:
         logger.debug("no previous entries found")
         last_checksum = "sha256:none"
@@ -103,35 +77,34 @@ def db_get_last_checksum(connection, distribution, release):
         last_checksum = row[0]
 
     database_cursor.close()
-
     return last_checksum
 
 
-def db_get_last_entry(connection, distribution, release):
-    return db_get_release_versions(connection, distribution, release, 1)
-
-
-def db_get_release_versions(connection, distribution, release, limit):
-
-    logger.debug("distribution: " + distribution + " release: " + release + " limit: " + str(limit))
+def db_get_release_versions(
+        connection: sqlite3.Connection, distribution: str,
+        release: str, limit: int
+) -> dict:
+    logger.debug(
+        f"distribution: {distribution} release: {release} limit: {limit}"
+    )
+    if release == "all":
+        call = "SELECT name, release_date, version, distribution_name, \
+            distribution_release, url, checksum FROM image_catalog \
+            WHERE distribution_name = '{distribution}' \
+            ORDER BY id DESC LIMIT {limit}"
+    else:
+        call = "SELECT name, release_date, version, distribution_name, \
+            distribution_release, url, checksum FROM image_catalog \
+            WHERE distribution_name = '{distribution}' \
+            AND distribution_release = '{release}' \
+            ORDER BY id DESC LIMIT {limit}"
     try:
         database_cursor = connection.cursor()
-        if release == "all":
-            database_cursor.execute(
-                "SELECT name, release_date, version, distribution_name, "
-                "distribution_release, url, checksum FROM image_catalog "
-                "WHERE distribution_name = '%s'"
-                "ORDER BY id DESC LIMIT %d" % (distribution, limit)
-            )
-        else:
-            database_cursor.execute(
-                "SELECT name, release_date, version, distribution_name, "
-                "distribution_release, url, checksum FROM image_catalog "
-                "WHERE distribution_name = '%s' AND distribution_release = '%s' "
-                "ORDER BY id DESC LIMIT %d" % (distribution, release, limit)
-            )
+        database_cursor.execute(call)
     except sqlite3.OperationalError as error:
-        logger.error(error)
+        logger.error(
+            f"DB OperationalError while fetching release versions\n{error}"
+        )
         sys.exit(1)
     row = database_cursor.fetchone()
 
@@ -146,37 +119,44 @@ def db_get_release_versions(connection, distribution, release, limit):
         last_entry["checksum"] = row[6]
 
         database_cursor.close()
-
         return last_entry
     else:
         # or empty dict?
         return None
 
 
-def read_version_from_catalog(connection, distribution, release, version):
+def db_get_last_entry(
+    connection: sqlite3.Connection, distribution: str, release: str
+) -> dict:
+    return db_get_release_versions(connection, distribution, release, 1)
+
+
+def read_version_from_catalog(
+    connection: sqlite3.Connection, distribution: str,
+    release: str, version: str
+) -> dict:
+    if release == "all":
+        call = "SELECT version,checksum,url,release_date \
+            FROM (SELECT * FROM image_catalog \
+            WHERE distribution_name = '{distribution}' \
+            AND version ='{version}' \
+            ORDER BY id DESC LIMIT 1) \
+            ORDER BY ID"
+    else:
+        call = "SELECT version,checksum,url,release_date \
+            FROM (SELECT * FROM image_catalog \
+            WHERE distribution_name = '{distribution}' \
+            AND distribution_release = '{release}' \
+            AND version ='{version}' \
+            ORDER BY id DESC LIMIT 1) \
+            ORDER BY ID"
     try:
         database_cursor = connection.cursor()
-        if release == "all":
-            database_cursor.execute(
-                "SELECT version,checksum,url,release_date "
-                "FROM (SELECT * FROM image_catalog "
-                "WHERE distribution_name = '%s' "
-                "AND version ='%s' "
-                "ORDER BY id DESC LIMIT 1) "
-                "ORDER BY ID" % (distribution, version)
-            )
-        else:
-            database_cursor.execute(
-                "SELECT version,checksum,url,release_date "
-                "FROM (SELECT * FROM image_catalog "
-                "WHERE distribution_name = '%s' "
-                "AND distribution_release = '%s' "
-                "AND version ='%s' "
-                "ORDER BY id DESC LIMIT 1) "
-                "ORDER BY ID" % (distribution, release, version)
-            )
+        database_cursor.execute(call)
     except sqlite3.OperationalError as error:
-        logger.error(error)
+        logger.error(
+            f"DB OperationalError while fetching version from catalog\n{error}"
+        )
         raise SystemExit(1)
 
     image_catalog = {}
@@ -192,7 +172,9 @@ def read_version_from_catalog(connection, distribution, release, version):
     return image_catalog
 
 
-def write_catalog_entry(connection, update):
+def write_catalog_entry(
+    connection: sqlite3.Connection, update: dict
+) -> None:
     try:
         database_cursor = connection.cursor()
         database_cursor.execute(
@@ -212,76 +194,86 @@ def write_catalog_entry(connection, update):
         )
         connection.commit()
     except sqlite3.OperationalError as error:
-        logger.error(error)
+        logger.error(
+            f"DB OperationalError while writing catalog entry\n{error}"
+        )
         raise SystemExit(1)
-
     database_cursor.close()
-
     return None
 
 
-def update_catalog_entry(connection, update):
+def update_catalog_entry(
+    connection: sqlite3.Connection, update: dict
+) -> None:
     try:
         database_cursor = connection.cursor()
         database_cursor.execute(
-            "UPDATE image_catalog set url=?, checksum=? " "WHERE name=? AND version=?",
-            (update["url"], update["checksum"], update["name"], update["version"]),
+            "UPDATE image_catalog set url=?, checksum=? "
+            "WHERE name=? AND version=?",
+            (
+                update["url"],
+                update["checksum"],
+                update["name"],
+                update["version"]
+            ),
         )
         connection.commit()
     except sqlite3.OperationalError as error:
-        logger.error(error)
+        logger.error(
+            f"DB OperationalError while updating catalog entry\n{error}"
+        )
         raise SystemExit(1)
-
     database_cursor.close()
-
     return None
 
 
-def write_or_update_catalog_entry(connection, update):
+def write_or_update_catalog_entry(
+    connection: sqlite3.Connection, update: dict
+) -> None:
     existing_entry = read_version_from_catalog(
         connection,
         update["distribution_name"],
         update["distribution_release"],
-        update["version"],
+        update["version"]
     )
-
     if update["version"] in existing_entry["versions"]:
-        if "Fedora" in update["name"] :
-            logger.info("Updating release " + update["distribution_release"])
+        if "Fedora" in update["name"]:
+            logger.info(f"Updating release {update['distribution_release']}")
         else:
-            logger.info("Updating version " + update["version"])
+            logger.info("Updating version {update['version']}")
         return update_catalog_entry(connection, update)
     else:
         return write_catalog_entry(connection, update)
 
 
-def read_release_from_catalog(connection, distribution, release, limit):
+def read_release_from_catalog(
+    connection: sqlite3.Connection, distribution: str,
+    release: str, limit: int
+) -> dict:
+    if release == "all":
+        call = "SELECT version,checksum,url,release_date,distribution_release \
+            FROM (SELECT * FROM image_catalog \
+            WHERE distribution_name = '{distribution}' \
+            ORDER BY id DESC LIMIT {limit}) \
+            ORDER BY ID"
+    else:
+        call = "SELECT version,checksum,url,release_date,distribution_release \
+            FROM (SELECT * FROM image_catalog \
+            WHERE distribution_name = '{distribution}' \
+            AND distribution_release = '{release}' \
+            ORDER BY id DESC LIMIT {limit}) \
+            ORDER BY ID"
     try:
         database_cursor = connection.cursor()
-        if release == "all":
-            database_cursor.execute(
-                "SELECT version,checksum,url,release_date,distribution_release "
-                "FROM (SELECT * FROM image_catalog "
-                "WHERE distribution_name = '%s' "
-                "ORDER BY id DESC LIMIT %d) "
-                "ORDER BY ID" % (distribution, limit)
-            )
-        else:
-            database_cursor.execute(
-                "SELECT version,checksum,url,release_date,distribution_release "
-                "FROM (SELECT * FROM image_catalog "
-                "WHERE distribution_name = '%s' "
-                "AND distribution_release = '%s' "
-                "ORDER BY id DESC LIMIT %d) "
-                "ORDER BY ID" % (distribution, release, limit)
-            )
+        database_cursor.execute(call)
     except sqlite3.OperationalError as error:
-        logger.error(error)
+        logger.error(
+            f"DB OperationalError while reading release from catalog\n{error}"
+        )
         raise SystemExit(1)
 
     image_catalog = {}
     image_catalog["versions"] = {}
-
     for image in database_cursor.fetchall():
         version = image[0]
         image_catalog["versions"][version] = {}
@@ -289,5 +281,4 @@ def read_release_from_catalog(connection, distribution, release, limit):
         image_catalog["versions"][version]["url"] = image[2]
         image_catalog["versions"][version]["release_date"] = image[3]
         image_catalog["versions"][version]["distribution_release"] = image[4]
-
     return image_catalog

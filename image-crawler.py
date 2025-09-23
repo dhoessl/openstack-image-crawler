@@ -8,139 +8,101 @@
 #
 # 2023-06-11 v0.4.0 christian.stelter@plusserver.com
 
-import argparse
 import sys
 import os
 from loguru import logger
+from crawler.core.args import get_args
 from crawler.core.config import config_read
 from crawler.core.database import (
-    database_connect,
-    database_disconnect,
-    database_initialize,
+    database_connect, database_disconnect, database_initialize
 )
 from crawler.core.exporter import export_image_catalog, export_image_catalog_all
 from crawler.core.main import crawl_image_sources
 from crawler.git.base import clone_or_pull, update_repository
 
 
-def main():
-    working_directory = os.getcwd()
-    program_directory = os.path.dirname(os.path.abspath(__file__))
-
-    parser = argparse.ArgumentParser(
-        description="checks cloud image repositories for new updates and"
-        + " keeps track of all images within its sqlite3 database"
+def define_logger(debug: bool) -> None:
+    log_level = "INFO"
+    log_format = (
+        "<level>{message}</level>"
     )
-    parser.add_argument(
-        "--config",
-        type=str,
-        required=False,
-        help="specify the config file to be used (default: <path_to_crawler_dir>/etc/config.yaml)",
-    )
-    parser.add_argument(
-        "--sources",
-        type=str,
-        required=False,
-        help="specify the sources file to be used - overrides value from config file",
-    )
-    parser.add_argument(
-        "--init-db",
-        action="store_true",
-        required=False,
-        help="initialize image catalog database",
-    )
-    parser.add_argument(
-        "--export-only",
-        action="store_true",
-        required=False,
-        help="export only existing image catalog",
-    )
-    parser.add_argument(
-        "--updates-only",
-        action="store_true",
-        required=False,
-        help="check only for updates, do not export catalog",
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        required=False,
-        help="give more output for debugging",
-    )
-    args = parser.parse_args()
-
-    if args.debug:
+    if debug:
         log_level = "DEBUG"
         log_format = (
-            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | "
-            "<cyan>{name}:{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<level>{level: <8}</level> | "
+            "<cyan>{name}:{function}</cyan>:<cyan>{line}</cyan> "
+            "- <level>{message}</level>"
         )
-    else:
-        log_level = "INFO"
-        log_format = (
-            "<level>{message}</level>"
-        )
-
     logger.remove()
     logger.add(sys.stderr, format=log_format, level=log_level, colorize=True)
-
     logger.info("plusserver Image Crawler v0.4.0 started")
 
-    # read configuration
-    if args.config is not None:
-        config_filename = args.config
-    else:
-        # default
-        config_filename = program_directory + "/etc/config.yaml"
 
-    config = config_read(config_filename, "configuration")
+def get_config(config_file, sources_file) -> tuple:
+    # read config file
+    config = config_read(config_file, "configuration")
     if config is None:
-        logger.error("ERROR: Unable to open config " + config_filename)
         raise SystemExit(1)
 
     # read the image sources
-    if args.sources is not None:
-        sources_filename = args.sources
+    if sources_file is not None:
+        sources_filename = sources_file
     else:
         sources_filename = config["sources_name"]
-
-    image_source_catalog = config_read(sources_filename, "source catalog")
+    image_source_catalog = config_read(sources_filename, "image source catalog")
     if image_source_catalog is None:
-        logger.error("Unable to open image source catalog " + sources_filename)
         raise SystemExit(1)
+
+    return (config, image_source_catalog)
+
+
+def clone_or_update_repo(config: dict, git_ssh_command) -> str:
+    if "branch" in config:
+        working_branch = config["branch"]
+    else:
+        working_branch = "main"
+    clone_or_pull(
+        config["remote_repository"],
+        config["local_repository"],
+        working_branch,
+        git_ssh_command
+    )
+
+
+def main() -> None:
+    working_directory = os.getcwd()
+    program_directory = os.path.dirname(os.path.abspath(__file__))
+
+    args = get_args(program_directory)
+    define_logger(args.debug)
+
+    config, image_source_catalog = get_config(args.config, args.sources)
 
     # initialize database when run with --init-db
     if args.init_db:
         database_initialize(config["database_name"], program_directory)
         sys.exit(0)
 
+    # set git_ssh_command if set in config
+    if "git_ssh_command" in config:
+        git_ssh_command = config["git_ssh_command"]
+    else:
+        git_ssh_command = None
+
     # clone or update local repository when git is enabled
     if "remote_repository" in config:
-        if "git_ssh_command" in config:
-            git_ssh_command = config["git_ssh_command"]
-        else:
-            git_ssh_command = None
-        if "branch" in config:
-            working_branch = config["branch"]
-        else:
-            working_branch = main
-        clone_or_pull(
-            config["remote_repository"],
-            config["local_repository"],
-            working_branch,
-            git_ssh_command,
-        )
+        clone_or_update_repo(config, git_ssh_command)
     else:
         logger.warning("No image catalog repository configured")
 
     # connect to database
     database = database_connect(config["database_name"])
     if database is None:
-        logger.error("Could not open database %s" % config["database_name"])
-        logger.error(
-            'Run "./image-crawler.py --init-db" to create a new database OR config check your etc/config.yaml'
+        raise ValueError(
+            "No database connected. Run './image-crawler.py --init-db' to "
+            f"create new database OR check your config at {args.config}."
         )
-        sys.exit(1)
 
     # crawl image sources when requested
     if args.export_only:
@@ -150,45 +112,47 @@ def main():
         logger.info("Start repository crawling")
         updated_sources = crawl_image_sources(image_source_catalog, database)
 
-    # export image catalog
+    # skip export image catalog if updates_only flag is set
     if args.updates_only:
         logger.info("Skipping catalog export")
-    else:
-        if config["local_repository"].startswith("/"):
-            export_path = config["local_repository"]
-        else:
-            export_path = working_directory + "/" + config["local_repository"]
+        database_disconnect(database)
+        return None
 
-        if updated_sources:
-            logger.info("Exporting catalog to %s" % export_path)
-            export_image_catalog(
-                database,
-                image_source_catalog,
-                updated_sources,
-                config["local_repository"],
-                config["template_path"],
+    # export image catalog
+    if config["local_repository"].startswith("/"):
+        export_path = config["local_repository"]
+    else:
+        export_path = os.path.join(
+            working_directory, config["local_repository"]
+        )
+
+    if updated_sources:
+        logger.info(f"Exporting catalog to {export_path}")
+        export_image_catalog(
+            database,
+            image_source_catalog,
+            updated_sources,
+            config["local_repository"],
+            config["template_path"],
+        )
+        # push changes to git repository when configured
+        if "remote_repository" in config:
+            update_repository(
+                database, config["local_repository"],
+                updated_sources, git_ssh_command
             )
         else:
-            if args.export_only:
-                logger.info("Exporting all catalog files to %s" % export_path)
-                export_image_catalog_all(
-                    database,
-                    image_source_catalog,
-                    config["local_repository"],
-                    config["template_path"],
-                )
-
-    # push changes to git repository when configured
-    if "remote_repository" in config and updated_sources:
-        update_repository(
-            database, config["local_repository"], updated_sources, git_ssh_command
+            logger.info("No remote repository update needed.")
+    if not updated_sources and args.export_only:
+        logger.info(f"Exporting all catalog files to {export_path}")
+        export_image_catalog_all(
+            database,
+            image_source_catalog,
+            config["local_repository"],
+            config["template_path"],
         )
-    else:
-        logger.info("No remote repository update needed.")
-
     database_disconnect(database)
 
 
 if __name__ == "__main__":
-
     main()
