@@ -22,6 +22,7 @@ class ImageUpdateChecker:
         self.last_checksum = last_checksum
         self.distribution_name = source_name
         self.current_checksum = None
+        self.checksum_url = None
         self.release_url = None
         self.update_available = False
         self.metadata = None
@@ -45,7 +46,8 @@ class ImageUpdateChecker:
         image_metadata = Metadata(
             self.release_url, self.release["baseURL"],
             self.release["image"], self.distribution_name,
-            self.release["name"]
+            self.release["name"], self.current_checksum,
+            self.checksum_url
         )
         image_metadata.build_metadata()
         if not image_metadata.url:
@@ -106,6 +108,7 @@ class ImageUpdateChecker:
             and self.release["checksum"]["filesearch"]
         ):
             checksum_url = self._get_dynamic_checksum_url()
+        self.checksum_url = checksum_url
         logger.debug(f"checksum_url: {checksum_url}")
         checksum_list = url_fetch_content(checksum_url)
         if checksum_list is None:

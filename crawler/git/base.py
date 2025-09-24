@@ -24,8 +24,9 @@ def clone_or_pull(
                 remote_repository, repository, branch=working_branch
             )
         except git.exc.GitCommandError as error:
-            logger.error(f"Cloning of {remote_repository} failed with {error}")
-            raise SystemExit(1)
+            raise RuntimeError(
+                f"Cloning of {remote_repository} failed with {error}"
+            )
     else:
         logger.info(
             f"Repository exists already, pulling changes ({working_branch})"
@@ -34,16 +35,14 @@ def clone_or_pull(
         try:
             image_repo.remotes.origin.pull()
         except git.exc.GitCommandError as error:
-            logger.error(f"Update (pull) failed with {error}")
-            raise SystemExit(1)
+            raise RuntimeError(f"Update (pull) failed with {error}")
 
         try:
             image_repo.git.checkout(working_branch)
         except git.exc.GitCommandError as error:
-            logger.error(
+            raise RuntimeError(
                 f"Checkout on branch {working_branch} failed with {error}"
             )
-            raise SystemExit(1)
 
 
 def update_repository(
@@ -92,4 +91,6 @@ def update_repository(
     try:
         image_repo.remotes.origin.push()
     except Exception as error:
-        logger.error(f"Push into upstream repository failed!\n{error}")
+        raise RuntimeError(
+            f"Push into upstream repository failed!\n{error}"
+        )

@@ -1,0 +1,40 @@
+---
+images:
+{% for release in distribution -%}
+  - name: "{{ distribution[release][0].release_name }}"
+    shortname: "{{ distribution[release][0].release_name |lower |replace(" ", "-") }}"
+    format: "{{ release_config[release]['image']['extension'] |default('qcow2') }}"
+    login: "{{ release_config[release]['image_config']['login'] }}"
+    min_disk: "{{ release_config[release]['image_config']['min_disk'] |defalt('8') }}"
+    min_ram: "{{ release_config[release]['image_config']['min_ram'] |default('512') }}"
+    status: "{{ release_config[release]['image_config']['status'] |default('active') }}"
+    visibility: "{{ release_config[release]['image_config']['visibility'] |default('public') }}"
+    multi: {{ release_config[release]['image_config']['multi'] |default(true) }}
+    tags: {{ release_config[release]['image_config']['tags'] |default([]) }}
+    meta:
+      architecture: "{{ release_config[release]['image']['arch'] |default('x86_64') }}"
+      hypervisor_type: "{{ release_config[release]['image_meta']['hypervisor_type'] |default('qemu') }}"
+      hw_disk_bus: "{{ release_config[release]['image_meta']['hw_disk_bus'] |default('scsi') }}"
+      hw_rng_model: "{{ release_config[release]['image_meta']['hw_rng_model'] |default('virtio') }}"
+      hw_scsi_model: "{{ release_config[release]['image_meta']['hw_scsi_model'] |default('virtio-scsi') }}"
+      hw_qemu_guest_agent: {{ release_config[release]['image_meta']['hw_qemu_guest_agent'] |default(true) }}
+      hw_watchdog_action: "{{ release_config[release]['image_meta']['hw_watchdog_action'] |default('reset') }}"
+      replace_frequency: "{{ release_config[release]['image_meta']['replace_frequency'] |default('monthly') }}"
+      hotfix_hours: "{{ release_config[release]['image_meta']['hotfix_hours'] |default('0') }}"
+      uuid_validity: "{{ release_config[release]['image_meta']['uuid_validity'] |default('last-3') }}"
+      provided_until: {{ release_config[release]['image_meta']['provided_until'] |default('none') }}
+      os_distro: "{{ distribution[release][0].distribution_name |lower }}"
+      os_version: "{{ distribution[release][0].distribution_release }}"
+    latest_checksum_url: "{{ latest[release] }}"
+    latest_url: "{{ latest[release].url }}"
+    versions:
+{% for version in release['versions'] -%}
+      - version: "{{ version['metadata']['version'] }}"
+        url: "{{ version['metadata']['url'] }}"
+        checksum: "{{ version['metadata']['checksum'] }}"
+        build_date: "{{ version['metadata']['release_date'] }}"
+        image_source: "{{ version['metadata']['url'] }}"
+        image_description: "{{ release_config[release]['image_config']['image_description'] |default('') }}"
+{% endfor -%}
+{% endfor %}
+...

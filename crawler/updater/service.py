@@ -81,59 +81,7 @@ from crawler.updater.update_check import ImageUpdateChecker
 #                 # catalog_entry_list.append(release["name"])
 
 
-# def image_update_service(connection, source):
-#     updated_releases = []
-#     supported_releases = [
-#         "ubuntu", "debian", "Alma", "flatcar", "Fedora", "Rocky"
-#     ]
-#     for release in source["releases"]:
-#         # Check if any release is not supported
-#         if release in supported_releases:
-#             continue
-#         logger.error(
-#             f"Unsupported distribution {source['name']}"
-#             " => Please check your images-sources.yaml"
-#         )
-#     for release in source["releases"]:
-#         last_checksum = db_get_last_checksum(
-#             connection, source["name"], release["name"]
-#         )
-#
-#         logger.debug("last_checksum:" + last_checksum)
-#
-#         if "ubuntu" in release["imagename"]:
-#             catalog_update = ubuntu_update_check(release, last_checksum)
-#         elif "debian" in release["imagename"]:
-#             catalog_update = debian_update_check(release, last_checksum)
-#         elif "Alma" in release["imagename"]:
-#             catalog_update = alma_update_check(release, last_checksum)
-#         elif "flatcar" in release["imagename"]:
-#             catalog_update = flatcar_update_check(release, last_checksum)
-#         elif "Fedora" in release["imagename"]:
-#             catalog_update = fedora_update_check(release, last_checksum)
-#         elif "Rocky" in release["imagename"]:
-#             catalog_update = rocky_update_check(release, last_checksum)
-#         if catalog_update:
-#             logger.info("Update found for " + source["name"] + " " + release["name"])
-#             logger.info("New release " + catalog_update["version"])
-#             # catalog_update anreichern mit _allen_ Daten für die DB
-#             catalog_update["distribution_name"] = source["name"]
-#             if "Fedora" in release["imagename"]:
-#                 catalog_update["name"] = source["name"] + " " + catalog_update["release_id"]
-#                 catalog_update["distribution_release"] = catalog_update["release_id"]
-#             else:
-#                 catalog_update["name"] = source["name"] + " " + release["name"]
-#                 catalog_update["distribution_release"] = release["name"]
-#             catalog_update["release"] = release["name"]
-#
-#             write_or_update_catalog_entry(connection, catalog_update)
-#             updated_releases.append(release["name"])
-#         else:
-#             logger.info("No update found for " + source["name"] + " " + release["name"])
-#     return updated_releases
-
-
-def image_update_service_v2(database: Database, source: dict) -> dict:
+def image_update_service(database: Database, source: dict) -> dict:
     updated_releases = []
     for release in source["releases"]:
         # Check if release is supported. If its no supported exception will be
@@ -156,7 +104,7 @@ def image_update_service_v2(database: Database, source: dict) -> dict:
                 f"New release {updater.update['version']}"
             )
             # write changes to db
-            database.write_or_update_catalog_entry(updater)
+            database.write_or_update_catalog_entry(updater.metadata)
             # mark changes to be processed later
             updated_releases.append(release["name"])
         else:
@@ -172,7 +120,7 @@ def check_release(image_distro: str, source_name: str) -> None:
         "ubuntu", "debian", "AlmaLinux", "flatcar", "Fedora", "Rocky"
     ]
     if image_distro not in supported_releases:
-        raise NotImplementedError(
+        raise RuntimeError(
             f"Unsupported distribution {source_name}"
             " => Please check your images-sources.yaml. Skipping Releases."
         )

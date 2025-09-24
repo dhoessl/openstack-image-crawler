@@ -50,7 +50,7 @@ def get_filename_pattern(image_data: dict, log_prefix: str) -> re.Pattern:
             fr"{image_data['extension']}$"
         )
     else:
-        raise NotImplementedError(
+        raise RuntimeError(
             f"{log_prefix} filename pattern not implemented!"
         )
 
@@ -69,7 +69,7 @@ def get_release_folder_pattern(image_data: dict, log_prefix: str) -> re.Pattern:
         # Example: 20250801-2191/
         return re.compile(r".*?release-(\d{8})\/$")
     else:
-        raise NotImplementedError(
+        raise RuntimeError(
             f"{log_prefix} folder pattern not implemented!"
         )
 
@@ -106,7 +106,7 @@ def get_checksum_search_pattern(
             fr".*?{image_data['extension']}.*?$"
         )
     else:
-        raise NotImplementedError(
+        raise RuntimeError(
             f"{distribution} {image_data['name']} checksum pattern not "
             "implemented!"
         )
@@ -126,7 +126,7 @@ def get_checksum_pattern(algorithm: str) -> re.Pattern:
         # md5 hash is always 128 chars long
         checksum_length = 128
     else:
-        raise NotImplementedError(
+        raise RuntimeError(
             f"{algorithm} not implemented. checksum_pattern not able to be "
             " created. Please make sure to implement"
         )

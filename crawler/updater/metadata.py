@@ -21,6 +21,8 @@ class MetadataBase:
         self.distribution_release = None  # release["name"]
         self.distribution_name = None  # source["name"]
         self.release_name = None  # f"{distribution_name} {image_name}"
+        self.checksum = None  # current checksum of this release
+        self.checksum_url = None  # url to current checksum file
         self.url = None  # url pointing to release download
         self.major = None  # major release version
         self.minor = None  # minor release version
@@ -46,7 +48,8 @@ class Metadata(MetadataBase):
     """
     def __init__(
         self, release_url: str, base_url: str,
-        image_data: dict, distribution_name: str, image_name: str
+        image_data: dict, distribution_name: str, image_name: str,
+        checksum: str
     ) -> None:
         """ create all possible metadata vars """
         super.__init__()
@@ -56,6 +59,7 @@ class Metadata(MetadataBase):
         self.distribution_release = image_name  # release["name"]
         self.distribution_name = distribution_name  # source["name"]
         self.release_name = f"{distribution_name} {image_name}"
+        self.checksum = checksum
         self.log_prefix = \
             f"{self.distribution_name}({self.image_data['version']})"
         self.filename_pattern = get_filename_pattern(
@@ -152,7 +156,7 @@ class Metadata(MetadataBase):
             self.minor = extract.group(3)
             self.patch = extract.group(4)
         else:
-            raise NotImplementedError(
+            raise RuntimeError(
                 f"{self.log_prefix} extracting is not implemented!"
             )
 

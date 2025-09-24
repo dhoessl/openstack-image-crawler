@@ -2,26 +2,25 @@
 #
 # image crawler
 #
-# the image crawler checks for new openstack ("cloud") images
-# whenever a new image is detected all relevant information needed for
-# maintaining an image catalog
+# image crawler checks for new images which are defined in the provided
+# config file. The image catalog is updated with information from config
+# and image url
 #
 # 2023-06-11 v0.4.0 christian.stelter@plusserver.com
+# 2025-09-24 v0.5.0 dominic.hoessl@gmail.com
 
 import sys
 import os
 from loguru import logger
 from crawler.core.args import get_args
 from crawler.core.config import config_read
-from crawler.core.database import (
-    database_connect, database_disconnect, database_initialize
-)
+from crawler.core.database import Database
 from crawler.core.exporter import export_image_catalog, export_image_catalog_all
 from crawler.core.main import crawl_image_sources
 from crawler.git.base import clone_or_pull, update_repository
 
 
-def define_logger(debug: bool) -> None:
+def define_logger(debug: bool, branding: str) -> None:
     log_level = "INFO"
     log_format = (
         "<level>{message}</level>"
@@ -36,14 +35,15 @@ def define_logger(debug: bool) -> None:
         )
     logger.remove()
     logger.add(sys.stderr, format=log_format, level=log_level, colorize=True)
-    logger.info("plusserver Image Crawler v0.4.0 started")
+    # TODO: fetch version from somewhere
+    logger.info(f"{branding} Image Crawler v0.5.0 started")
 
 
 def get_config(config_file, sources_file) -> tuple:
     # read config file
     config = config_read(config_file, "configuration")
     if config is None:
-        raise SystemExit(1)
+        raise RuntimeError("Configuration was not created")
 
     # read the image sources
     if sources_file is not None:
@@ -52,7 +52,7 @@ def get_config(config_file, sources_file) -> tuple:
         sources_filename = config["sources_name"]
     image_source_catalog = config_read(sources_filename, "image source catalog")
     if image_source_catalog is None:
-        raise SystemExit(1)
+        raise RuntimeError("Image source catalog could not been created")
 
     return (config, image_source_catalog)
 
@@ -71,18 +71,18 @@ def clone_or_update_repo(config: dict, git_ssh_command) -> str:
 
 
 def main() -> None:
-    working_directory = os.getcwd()
     program_directory = os.path.dirname(os.path.abspath(__file__))
 
     args = get_args(program_directory)
-    define_logger(args.debug)
+    define_logger(args.debug, args.branding_name)
 
     config, image_source_catalog = get_config(args.config, args.sources)
 
     # initialize database when run with --init-db
     if args.init_db:
-        database_initialize(config["database_name"], program_directory)
-        sys.exit(0)
+        database = Database(config["database_name"], init=True)
+        database.init_db(program_directory)
+        return None  # Exit if database was created
 
     # set git_ssh_command if set in config
     if "git_ssh_command" in config:
@@ -97,11 +97,11 @@ def main() -> None:
         logger.warning("No image catalog repository configured")
 
     # connect to database
-    database = database_connect(config["database_name"])
-    if database is None:
-        raise ValueError(
-            "No database connected. Run './image-crawler.py --init-db' to "
-            f"create new database OR check your config at {args.config}."
+    database = Database(config["database_name"])
+    if not database.is_alive():
+        raise RuntimeError(
+            "Database is not connected."
+            f"Please check your config at {args.config}"
         )
 
     # crawl image sources when requested
@@ -115,7 +115,7 @@ def main() -> None:
     # skip export image catalog if updates_only flag is set
     if args.updates_only:
         logger.info("Skipping catalog export")
-        database_disconnect(database)
+        database.disconnect()
         return None
 
     # export image catalog
@@ -123,7 +123,7 @@ def main() -> None:
         export_path = config["local_repository"]
     else:
         export_path = os.path.join(
-            working_directory, config["local_repository"]
+            os.getcwd(), config["local_repository"]
         )
 
     if updated_sources:
@@ -151,7 +151,7 @@ def main() -> None:
             config["local_repository"],
             config["template_path"],
         )
-    database_disconnect(database)
+    database.disconnect()
 
 
 if __name__ == "__main__":
