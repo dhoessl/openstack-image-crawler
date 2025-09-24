@@ -2,6 +2,8 @@
 sources:
   - name: "Ubuntu"
     vendor: "Canonical Ltd."
+    image_description: ""
+    min_disk: 
     releases:
       - name: "22.04"
         codename: "jammy"
@@ -32,6 +34,8 @@ sources:
 
   - name: "Ubuntu Minimal"
     vendor: "Canonical Ltd."
+    default_login: "ubuntu"
+    image_description: ""
     releases:
       - name: "22.04"
         codename: "jammy"
@@ -62,6 +66,7 @@ sources:
 
   - name: "Debian"
     vendor: "Debian Community"
+    image_description: ""
     releases:
       - name: "11"
         codename: "bullseye"
@@ -105,6 +110,7 @@ sources:
 
   - name: "AlmaLinux"
     vendor: "AlmaLinux OS"
+    image_description: ""
     releases:
       - name: '8'
         codename: "none"
@@ -152,6 +158,9 @@ sources:
 
   - name: "Flatcar"
     vendor: "Kinvolk"
+    default_login: "core"
+    image_description: ""
+    min_disk: 10
     releases:
       - name: "stable"
         codename: "none"
@@ -168,6 +177,8 @@ sources:
 
   - name: "Fedora"
     vendor: "Fedora Project"
+    image_description: ""
+    min_disk: 4
     releases:
       - name: '^(\d+).*?$'
         codename: "none"
@@ -202,6 +213,8 @@ sources:
 
   - name: "RockyLinux"
     vendor: "Rocky Linux Foundation"
+    image_description: ""
+    min_disk: 10
     releases:
       - name: '8'
         codename: "Green Obsidian"

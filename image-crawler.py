@@ -103,6 +103,8 @@ def main() -> None:
             "Database is not connected."
             f"Please check your config at {args.config}"
         )
+    # Check if database pragma is up to date
+    database.update()
 
     # crawl image sources when requested
     if args.export_only:

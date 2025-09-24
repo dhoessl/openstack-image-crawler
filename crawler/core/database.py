@@ -58,7 +58,7 @@ class Database:
             else:
                 cursor.execute(query)
             if commit:
-                cursor.commit()
+                self.connection.commit()
             return cursor
         except sqlite3.OperationalError as error:
             raise RuntimeError(
@@ -116,7 +116,7 @@ class Database:
     ) -> list:
         query = (
             "SELECT name, release_date, version, distribution_name, "
-            "distribution_release, url, checksum "
+            "distribution_release, url, checksum, checksum_url "
             "FROM image_catalog "
             "WHERE distribution_name = ? "
             "AND distribution_release = ? "
@@ -141,6 +141,7 @@ class Database:
             metadata.distribution_release = row[4]
             metadata.url = row[5]
             metadata.checksum = row[6]
+            metadata.checksum_url = row[7]
             metadata_list.append(metadata)
         return metadata_list
 
@@ -152,7 +153,7 @@ class Database:
             release version
         """
         query = (
-            "SELECT version, checksum, url, release_date "
+            "SELECT version, checksum, url, release_date"
             "FROM image_catalog "
             "WHERE distribution_name = ? "
             "AND distribution_release = ? "
@@ -184,25 +185,26 @@ class Database:
         query = (
             "INSERT INTO image_catalog "
             "(name, release_date, version, distribution_name, "
-            "distribution_release, url, checksum) "
+            "distribution_release, url, checksum, checksum_url) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)"
         )
         params = (
             metadata.release_name, metadata.release_date,
             metadata.distribution_name, metadata.distribution_release,
-            metadata.url, metadata.checksum
+            metadata.url, metadata.checksum, metadata.checksum_url
         )
         self.execute_query(query, params, commit=True, caller="write entry")
 
     def update_catalog_entry(self, metadata: Metadata) -> None:
         """ Updates existing entry with data from Metadata object """
         query = (
-            "UPDATE image_catalog set url=?, checksum=?, release_date=?"
+            "UPDATE image_catalog set url=?, checksum=?, "
+            "release_date=?, checksum_url=? "
             "WHERE name=? AND version=?"
         )
         params = (
             metadata.url, metadata.checksum, metadata.release_date,
-            metadata.release_name, metadata.version
+            metadata.checksum_url, metadata.release_name, metadata.version
         )
         self.execute_query(query, params, commit=True, caller="update entry")
 
@@ -218,3 +220,22 @@ class Database:
         else:
             logger.debug(f"{metadata.release_name} create entry")
             self.write_catalog_entry(metadata)
+
+    def update(self) -> None:
+        """ Checks if current db is up to date and if not upgrades it """
+        table_info_cursor = self.execute_query(
+            "PRAGMA table_info(image_catalog)", caller="Updater"
+        )
+        table_info = table_info_cursor.fetchall()
+        for row in table_info:
+            if row[1] == "checksum_url":
+                return None
+        logger.warning(
+            "Updating Database Table. Adding checksum_url column"
+        )
+        self.execute_query(
+            "ALTER TABLE image_catalog ADD checksum_url text",
+            commit=True, caller="checksum_url upgrade"
+        )
+        logger.info("Table update finished")
+        # TODO: pull all releases and add checksum_url

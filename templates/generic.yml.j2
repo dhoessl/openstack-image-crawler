@@ -1,12 +1,12 @@
 ---
 images:
 {% for release in distribution -%}
-  - name: "{{ distribution[release][0].release_name }}"
-    shortname: "{{ distribution[release][0].release_name |lower |replace(" ", "-") }}"
-    format: "{{ release_config[release]['image']['extension'] |default('qcow2') }}"
-    login: "{{ release_config[release]['image_config']['login'] }}"
-    min_disk: "{{ release_config[release]['image_config']['min_disk'] |defalt('8') }}"
-    min_ram: "{{ release_config[release]['image_config']['min_ram'] |default('512') }}"
+  - name: "{{ latest[release].release_name }}"
+    shortname: "{{ latest[release].release_name |lower |replace(' ', '-') }}"
+    format: "{{ distribution_config['releases'][0]['image']['extension'] |default('qcow2') }}"
+    login: "{{ distribution_config['default_login'] |default(distribution_config['name'] |lower |replace(' ', '_')) }}"
+    min_disk: {{ distribution_config['min_disk'] |defalt(8) }}
+    min_ram: {{ distribution_config['min_ram'] |default(512) }}
     status: "{{ release_config[release]['image_config']['status'] |default('active') }}"
     visibility: "{{ release_config[release]['image_config']['visibility'] |default('public') }}"
     multi: {{ release_config[release]['image_config']['multi'] |default(true) }}
@@ -25,16 +25,16 @@ images:
       provided_until: {{ release_config[release]['image_meta']['provided_until'] |default('none') }}
       os_distro: "{{ distribution[release][0].distribution_name |lower }}"
       os_version: "{{ distribution[release][0].distribution_release }}"
-    latest_checksum_url: "{{ latest[release] }}"
+    latest_checksum_url: "{{ latest[release].checksum_url }}"
     latest_url: "{{ latest[release].url }}"
     versions:
-{% for version in release['versions'] -%}
-      - version: "{{ version['metadata']['version'] }}"
-        url: "{{ version['metadata']['url'] }}"
-        checksum: "{{ version['metadata']['checksum'] }}"
-        build_date: "{{ version['metadata']['release_date'] }}"
-        image_source: "{{ version['metadata']['url'] }}"
-        image_description: "{{ release_config[release]['image_config']['image_description'] |default('') }}"
+{% for version in distribution[release] -%}
+      - version: "{{ version.version }}"
+        url: "{{ version.url }}"
+        checksum: "{{ version.checksum }}"
+        build_date: "{{ version.release_date }}"
+        image_source: "{{ version.url }}"
+        image_description: "{{ distribution_config['image_description'] |default('') }}"
 {% endfor -%}
 {% endfor %}
 ...

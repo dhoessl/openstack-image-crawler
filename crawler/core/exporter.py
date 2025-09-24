@@ -119,74 +119,9 @@ class Exporter:
                 latest=latest_release_catalog,
                 distribution_config=distribution_data
             )
-
-
-def export_image_catalog_helper(
-    database: Database, local_repository: str,
-    template_path: str, source: dict
-) -> None:
-    distribution = source["name"]
-    logger.info(f"Exporting image catalog for {distribution}")
-
-    catalog_export = ""
-
-    image_template_filename = os.path.join(
-        template_path, f"{distribution.lower().replace(' ', '_')}.yml.j2",
-    )
-    image_template_file = open(image_template_filename, "r")
-    image_template = Template(image_template_file.read())
-    image_template_file.close()
-
-    for release in source["releases"]:
-        if "limit" in release:
-            limit = release["limit"]
-        else:
-            limit = 3
-        release_catalog = limit
-        # release_catalog = read_release_from_catalog(
-        #     database, distribution, release["name"], limit
-        # )
-        # metadata_list = database.get_release_versions(
-        #     distribution, release["name"], limit
-        # )
-        if release_catalog["versions"]:
-            release_catalog["name"] = distribution
-            release_catalog["os_distro"] = distribution.lower()
-            release_catalog["os_version"] = release["name"]
-            release_catalog["codename"] = release["codename"]
-
-            logger.debug(
-                f"Rendering template for {release_catalog['name']} "
-                f"{release_catalog['os_version']}"
-            )
-
-            catalog_export = (
-                catalog_export
-                + image_template.render(
-                    catalog=release_catalog, metadata=release
-                )
-                + "\n"
-            )
-        else:
-            logger.warning(
-                f"got no catalog entries for {distribution} {release['name']}"
-            )
-
-    if len(release_catalog) > 0:
-        header_file = open(template_path + "/header.yml")
-        catalog_header = header_file.read()
-        header_file.close()
-
-        catalog_export = catalog_header + catalog_export
-
-        image_catalog_export_filename = os.path.join(
-            local_repository,
-            f"{distribution.lower().replace(' ', '_')}.yml"
+        distribution_export_file = os.path.join(
+            self.repository,
+            f"{distribution_data['name'].lower().replace(' ', '_')}.yml"
         )
-        image_catalog_export_file = open(
-            image_catalog_export_filename, "w"
-        )
-        image_catalog_export_file.write(catalog_export)
-        image_catalog_export_file.close()
-    else:
-        logger.debug(f"nothing to export for {distribution}")
+        with open(distribution_export_file, "w") as exportfile:
+            exportfile.write(distribution_release_string)
