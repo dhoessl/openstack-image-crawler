@@ -13,7 +13,34 @@ from crawler.updater.pattern import (
 )
 
 
-class Metadata:
+class MetadataBase:
+    """ provides core vars for metadata without further processing """
+    def __init__(self) -> None:
+        self.base_url = None  # url pointing to release base folder
+        self.release_url = None  # url pointing to image base folder
+        self.distribution_release = None  # release["name"]
+        self.distribution_name = None  # source["name"]
+        self.release_name = None  # f"{distribution_name} {image_name}"
+        self.url = None  # url pointing to release download
+        self.major = None  # major release version
+        self.minor = None  # minor release version
+        self.patch = None  # patch release version
+        self.release_date = None  # release date in %Y-%m-%d
+        self.release_date_suffix = None  # release date suffix
+        self.version = None  # release_date in %Y%m%d
+
+    def _format_release_date(self) -> None:
+        """ formate the release date into %Y-%m-%d """
+        self.release_date = datetime\
+            .strptime(self.release_date, "%Y%m%d")\
+            .strftime("%Y-%m-%d")
+
+    def _get_version_from_date(self, filedate) -> str:
+        """ format %Y-%m-%d date to %Y%m%d version format """
+        return datetime.strptime(filedate, "%Y-%m-%d").strftime("%Y%m%d")
+
+
+class Metadata(MetadataBase):
     """ provides vars for all available metadata.
         data will be fetched from provided information
     """
@@ -22,19 +49,13 @@ class Metadata:
         image_data: dict, distribution_name: str, image_name: str
     ) -> None:
         """ create all possible metadata vars """
+        super.__init__()
         self.base_url = base_url
         self.release_url = release_url
         self.image_data = image_data
         self.distribution_release = image_name  # release["name"]
         self.distribution_name = distribution_name  # source["name"]
         self.release_name = f"{distribution_name} {image_name}"
-        self.url = None  # url pointing to release download
-        self.major = None  # major release version
-        self.minor = None  # minor release version
-        self.patch = None  # patch release version
-        self.release_date = None  # release date in %Y-%m-%d
-        self.release_date_suffix = None  # release date suffix
-        self.version = None  # release_date in %Y%m%d
         self.log_prefix = \
             f"{self.distribution_name}({self.image_data['version']})"
         self.filename_pattern = get_filename_pattern(
@@ -134,16 +155,6 @@ class Metadata:
             raise NotImplementedError(
                 f"{self.log_prefix} extracting is not implemented!"
             )
-
-    def _format_release_date(self) -> None:
-        """ formate the release date into %Y-%m-%d """
-        self.release_date = datetime\
-            .strptime(self.release_date, "%Y%m%d")\
-            .strftime("%Y-%m-%d")
-
-    def _get_version_from_date(self, filedate) -> str:
-        """ format %Y-%m-%d date to %Y%m%d version format """
-        return datetime.strptime(filedate, "%Y-%m-%d").strftime("%Y%m%d")
 
     def _get_latest_release_folder(self, url: str, pattern: re.Pattern) -> str:
         """ find a folder depending on a given pattern and return the locaiton

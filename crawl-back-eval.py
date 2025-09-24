@@ -19,7 +19,7 @@ from crawler.core.main import crawl_back_image_sources
 
 
 def main():
-    working_directory = os.getcwd()
+    # working_directory = os.getcwd()
     program_directory = os.path.dirname(os.path.abspath(__file__))
 
     parser = argparse.ArgumentParser(
@@ -87,6 +87,6 @@ def main():
 
     database_disconnect(database)
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     main()

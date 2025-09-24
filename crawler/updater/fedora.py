@@ -10,7 +10,6 @@ from crawler.web.generic import url_get_last_modified, url_fetch_content
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from pprint import pprint
 
 def get_latest_release(release):
     # as specified in image-sources.yaml
@@ -43,6 +42,7 @@ def get_latest_release(release):
     # ToDo - in case of no last_link found we need an None
     return release_id
 
+
 def get_image_filename(release, images_url):
     request = requests.get(images_url, allow_redirects=True)
     soup = BeautifulSoup(request.text, "html.parser")
@@ -60,6 +60,7 @@ def get_image_filename(release, images_url):
         return last_link
     else:
         return None
+
 
 def get_checksum(release, images_url, image_filename):
     request = requests.get(images_url, allow_redirects=True)
@@ -97,6 +98,7 @@ def get_checksum(release, images_url, image_filename):
 
     return None
 
+
 def fedora_update_check(release, last_checksum):
     # as specified in image-sources.yaml
     # baseURL: https://ftp.plusline.net/fedora/linux/releases/
@@ -115,7 +117,7 @@ def fedora_update_check(release, last_checksum):
         logger.warn("did not find any matching filenames")
         return None
 
-    logger.debug("image_filename: " +  image_filename)
+    logger.debug("image_filename: " + image_filename)
 
     logger.debug("checksum_path: " + images_url)
 
@@ -155,6 +157,7 @@ def fedora_update_check(release, last_checksum):
         return update
 
     return None
+
 
 def fedora_crawl_release(release):
     version_dir_list = []
@@ -207,7 +210,7 @@ def fedora_crawl_release(release):
             logger.warn("did not find any matching filenames")
             return None
 
-        logger.debug("image_filename: " +  image_filename)
+        logger.debug("image_filename: " + image_filename)
 
         logger.debug("checksum_path: " + images_url)
 

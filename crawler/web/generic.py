@@ -58,12 +58,3 @@ def url_get_last_modified(url: str) -> str:
     last_modified_date = request.headers["Last-Modified"]
     datestring = parsedate_to_datetime(last_modified_date).strftime("%Y-%m-%d")
     return datestring
-
-
-# Used for historian => now links are scanned before fetching data
-# def url_exists(url: str) -> bool:
-#     request = url_get_header(url)
-#     if request is None:
-#         return False
-#     else:
-#         return True

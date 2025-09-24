@@ -25,6 +25,7 @@ def build_image_url(release, versionpath):
         base_url + versionpath + release["imagename"] + "." + release["extension"]
     )
 
+
 def get_metadata(release, image_filedate):
     filedate = image_filedate.replace("-", "")
     requestURL = release["baseURL"]
@@ -56,6 +57,7 @@ def get_metadata(release, image_filedate):
         "version": version,
         "release_date": image_filedate,
     }
+
 
 def flatcar_update_check(release, last_checksum):
     # as specified in image-sources.yaml

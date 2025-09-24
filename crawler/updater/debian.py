@@ -7,12 +7,11 @@ import datetime
 import re
 
 from crawler.web.generic import url_get_last_modified
-from crawler.web.directory import web_get_checksum, web_get_current_image_metadata
+from crawler.web.directory import web_get_checksum
 
 from bs4 import BeautifulSoup
 from loguru import logger
 
-from pprint import pprint
 
 def build_image_url(release, versionpath):
     if not release["baseURL"].endswith("/"):
@@ -33,6 +32,7 @@ def build_image_url(release, versionpath):
         + release["extension"]
     )
 
+
 def release_date_from_version(release_version):
     # 20230601-1398
     release_date = (
@@ -44,6 +44,7 @@ def release_date_from_version(release_version):
     )
     return release_date
 
+
 def version_from_path(versionpath):
     # the path within the releases directory has the format
     #    20230601-1398/
@@ -52,6 +53,7 @@ def version_from_path(versionpath):
         versionpath = versionpath.rstrip("/")
 
     return versionpath
+
 
 def get_metadata(release, image_filedate):
     filedate = image_filedate.replace("-", "")
@@ -119,8 +121,8 @@ def get_metadata(release, image_filedate):
                 }
 
         days_back = days_back + 1
-
     return None
+
 
 def debian_update_check(release, last_checksum):
     # as specified in image-sources.yaml
@@ -178,8 +180,8 @@ def debian_update_check(release, last_checksum):
         else:
             logger.warn("got no metadata")
             return None
-
     return None
+
 
 def debian_crawl_release(release):
     version_dir_list = []
@@ -225,7 +227,7 @@ def debian_crawl_release(release):
         limit = 3
 
     for version_path in version_dir_list[-limit:]:
-        extract = release_pattern.search(version_path)
+        # extract = release_pattern.search(version_path)
 
         # version_path contains "20230612-1409" release version
         version = version_from_path(version_path)
@@ -235,7 +237,7 @@ def debian_crawl_release(release):
         # as specified in image-sources.yaml
         # imagename: debian-11-genericcloud-amd64
         # extension: qcow2
-        imagename = release["imagename"] + "-" + version  + "." + release["extension"]
+        imagename = release["imagename"] + "-" + version + "." + release["extension"]
 
         checksum_url = base_url + version_path + release["checksumname"]
         logger.debug("checksum_url: " + checksum_url)

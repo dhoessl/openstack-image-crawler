@@ -2,7 +2,6 @@ from jinja2 import Template
 import os
 
 from crawler.core.database import read_release_from_catalog
-from crawler.web.generic import format_url_part
 from loguru import logger
 from sqlite3 import Connection
 
