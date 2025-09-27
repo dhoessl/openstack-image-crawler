@@ -1,64 +1,61 @@
 # Check for updates on supported releases
 
-import re
 from os import path
 from loguru import logger
-from crawler.web.generic import url_fetch_links, url_fetch_content
+from crawler.web.generic import url_fetch_links
 from crawler.updater.metadata import Metadata
-from crawler.updater.pattern import (
-    get_checksum_search_pattern,
-    get_checksum_pattern
-)
+from crawler.updater.checksum import Checksum
 
 
-class ImageUpdateChecker:
+class ImageUpdateBase:
+    def __init__(
+        self, source_name: str, image_description: str | list,
+        release: dict, codename: str
+    ) -> None:
+        self.release = release
+        self.distribution_name = source_name
+        self.description_base = image_description
+        self.codename = codename
+        self.release_url = None  # url check for image file
+        self.checksum = None  # Checksum Object
+        self.metadata = None  # Metadata Object
+
+    def is_update_available(self) -> bool:
+        """ Checks Checksum Object. If Checksum Object indicates that checksum
+            are out of sync than an update is possible.
+        """
+        if self.checksum.is_match():
+            logger.debug("No Update!")
+            return False
+        else:
+            logger.debug("Update Possible")
+            return True
+
+    def get_metadata(self) -> Metadata:
+        """ builds metadata Object from Metadata class if not build before
+            and returns it
+        """
+        if type(self.metadata) is not Metadata:
+            logger.debug("Creating Metadata since it was not created before")
+            self.metadata = Metadata(
+                self.release, self.release_url, self.distribution_name,
+                self.checksum, self.description_base, self.codename
+            )
+        return self.metadata
+
+
+class ImageUpdateChecker(ImageUpdateBase):
     """ Class to check for updates and create an object for metadata
         information. Requires the one release dict from releases list.
     """
     def __init__(
-        self, source_name: str, release: dict, last_checksum: str
+        self, source_name: str, image_description: str | list,
+        release: dict, last_checksum: str, codename: str
     ) -> None:
-        self.release = release
-        self.last_checksum = last_checksum
-        self.distribution_name = source_name
-        self.current_checksum = None
-        self.checksum_url = None
-        self.release_url = None
-        self.update_available = False
-        self.metadata = None
-        self._setup_vars()
+        super().__init__(source_name, image_description, release, codename)
+        self._setup_vars(last_checksum)
 
-    def check_update(self) -> bool:
-        """ Checks if checksums non matching and updating metadata if needed.
-            sets self.update_available to True if an update is possible.
-            returns bool coresponding to self.update_available
-        """
-        if self.current_checksum == self.last_checksum:
-            logger.debug("checksum matches -> no update")
-            return self.update_available
-        if self.current_checksum is None:
-            logger.warning("Checksum is None -> no update")
-            return self.update_available
-        logger.debug(
-            "Checksum dont match => Fetching new image data! "
-            f"{self.last_checksum} <> {self.current_checksum}"
-        )
-        image_metadata = Metadata(
-            self.release_url, self.release["baseURL"],
-            self.release["image"], self.distribution_name,
-            self.release["name"], self.current_checksum,
-            self.checksum_url
-        )
-        image_metadata.build_metadata()
-        if not image_metadata.url:
-            logger.warning(f"got no metadata for {self.release['imagename']}")
-            return self.update_available
-        logger.debug(f"{self.release['image']['distro']} - metadata found")
-        self.metadata = image_metadata
-        self.update_available = True
-        return self.update_available
-
-    def _setup_vars(self) -> None:
+    def _setup_vars(self, last_checksum: str) -> None:
         """ Setup some basic vars needed for metadata fetching.
             this function is created to not clutter __init__.
         """
@@ -70,7 +67,10 @@ class ImageUpdateChecker:
         # search pattern with one capture group in releases[...]['name']
         # this part searches for latest release on the baseURL
         # releases[...]['name'] will be set to output of the capture group
-        if "latest" in self.release and self.release["latest"]:
+        if (
+            "latest" in self.release["image"]
+            and self.release["image"]["latest"]
+        ):
             search_pattern = fr"{self.release['name']}"
             links = url_fetch_links(self.release["baseURL"])
             while links:
@@ -89,58 +89,28 @@ class ImageUpdateChecker:
             )
             return None
         logger.debug(f"release_url: {self.release_url}")
-        self.current_checksum = self.release["image"]["algorithm"] + ":" \
-            + self._get_checksum()
-        logger.debug("current checksum: {self.current_checksum}")
+        if "filesearch" not in self.release["checksum"]:
+            self.release["checksum"]["filesearch"] = False
+        self.checksum = Checksum(
+            last_checksum, self.release_url, self.release["checksum"],
+            self.release["image"]
+        )
+        logger.debug("current checksum: {self.checksum.latest}")
 
-    def _get_checksum(self) -> str:
-        """ creates checksum_url from provided information and searches it for
-            hash of provided image information.
-            search pattern is build _get_checksum_search_pattern and can be
-            filled with further patterns if required.
-        """
-        checksum_url = path.join(
-            self.release_url,
-            self.release["checksum"]["filename"]
-        )
-        if (
-            "filesearch" in self.release["checksum"]
-            and self.release["checksum"]["filesearch"]
-        ):
-            checksum_url = self._get_dynamic_checksum_url()
-        self.checksum_url = checksum_url
-        logger.debug(f"checksum_url: {checksum_url}")
-        checksum_list = url_fetch_content(checksum_url)
-        if checksum_list is None:
-            logger.warning(f"No content found in {checksum_url}")
-            return None
-        checksum_line_pattern = get_checksum_search_pattern(
-            self.release["image"], self.distribution_name
-        )
-        checksum_pattern = get_checksum_pattern(
-            self.release["checksum"]["algorithm"]
-        )
-        for line in checksum_list.splitlines():
-            if not checksum_line_pattern.search(line):
-                # Skip line if its not matching the search pattern
-                continue
-            # if line matches extract checksum
-            extract = checksum_pattern.search(line)
-            if not extract:
-                logger.warning("checksum found but could not extract")
-                return None
-            return extract.group(1)  # group which is the checksum
-        return None
 
-    def _get_dynamic_checksum_url(self) -> str:
-        """ If the checksum file changes its name this is a way to do a dynamic
-            search for a file in the release_url folder.
-            To use this set release['checksum']['filesearch'] to true
-            and release['checksum']['filename'] to a regex string which
-            finds the file
-        """
-        all_files = url_fetch_links(self.release_url)
-        pattern = re.compile(fr"{self.release['checksum']['filename']}")
-        for file in all_files:
-            if pattern.search(file):
-                return path.join(self.release_url, file)
+class ImageUpdateCrawler(ImageUpdateBase):
+    def __init__(
+        self, source_name: str, image_description: str | list,
+        release: dict, codename: str, release_path: str
+    ) -> None:
+        super().__init__(source_name, image_description, release, codename)
+        self._setup_vars(release_path)
+
+    def _setup_vars(self, release_path: str) -> None:
+        self.release_url = release_path
+        logger.debug(f"release_url: {self.release_url}")
+        self.checksum = Checksum(
+            f"{self.release['checksum']['algorithm']}:none", self.release_url,
+            self.release["checksum"], self.release["image"]
+        )
+        logger.debug("current checksum: {self.checksum.latest}")

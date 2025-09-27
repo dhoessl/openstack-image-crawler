@@ -74,9 +74,7 @@ def get_release_folder_pattern(image_data: dict, log_prefix: str) -> re.Pattern:
         )
 
 
-def get_checksum_search_pattern(
-    image_data: dict, distribution: str
-) -> re.Pattern:
+def get_checksum_search_pattern(image_data: dict) -> re.Pattern:
     """ Create regex pattern to match correct checksum line in checksum file
     """
     if image_data["distro"] == "Fedora":
@@ -107,7 +105,7 @@ def get_checksum_search_pattern(
         )
     else:
         raise RuntimeError(
-            f"{distribution} {image_data['name']} checksum pattern not "
+            f"{image_data['distro']} {image_data['name']} checksum pattern not "
             "implemented!"
         )
 

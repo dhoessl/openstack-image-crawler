@@ -2,8 +2,10 @@
 sources:
   - name: "Ubuntu"
     vendor: "Canonical Ltd."
-    image_description: ""
-    min_disk: 
+    description:
+      - "https://launchpad.net/ubuntu/"
+      - "CODENAME"
+      - "/+source/linux/+changelog"
     releases:
       - name: "22.04"
         codename: "jammy"
@@ -36,6 +38,10 @@ sources:
     vendor: "Canonical Ltd."
     default_login: "ubuntu"
     image_description: ""
+    description:
+      - "https://launchpad.net/ubuntu/"
+      - "CODENAME"
+      - "/+source/linux/+changelog"
     releases:
       - name: "22.04"
         codename: "jammy"
@@ -66,7 +72,10 @@ sources:
 
   - name: "Debian"
     vendor: "Debian Community"
-    image_description: ""
+    image_description:
+      - "https://www.debian.org/releases/"
+      - "CODENAME"
+      - "/release-notes"
     releases:
       - name: "11"
         codename: "bullseye"
@@ -110,23 +119,12 @@ sources:
 
   - name: "AlmaLinux"
     vendor: "AlmaLinux OS"
-    image_description: ""
+    image_description:
+      - "https://wiki.almalinux.org/release-notes/"
+      - "MAJOR"
+      - "."
+      - "MINOR"
     releases:
-      - name: '8'
-        codename: "none"
-        baseURL: "https://repo.almalinux.org/almalinux/8/"
-        releasepath: "cloud/x86_64/images"
-        image:
-          distro: "AlmaLinux"
-          version: '8'
-          usage: "GenericCloud"
-          arch: "x86_64"
-          extension: "qcow2"
-        # imagename: AlmaLinux-8-GenericCloud-latest.x86_64
-        checksum:
-          filename: "CHECKSUM"
-          algorithm: "sha256"
-        limit: 1
       - name: '9'
         codename: "none"
         baseURL: "https://repo.almalinux.org/almalinux/9/"
@@ -159,7 +157,7 @@ sources:
   - name: "Flatcar"
     vendor: "Kinvolk"
     default_login: "core"
-    image_description: ""
+    image_description: "https://www.flatcar.org/releases"
     min_disk: 10
     releases:
       - name: "stable"
@@ -179,6 +177,12 @@ sources:
     vendor: "Fedora Project"
     image_description: ""
     min_disk: 4
+    replace_frequency: "quarterly"
+    uuid_validity: "last-1"
+    description:
+      - "https://docs.fedoraproject.org/en-US/fedora/f"
+      - "MAJOR"
+      - "/release-notes/"
     releases:
       - name: '^(\d+).*?$'
         codename: "none"
@@ -215,21 +219,13 @@ sources:
     vendor: "Rocky Linux Foundation"
     image_description: ""
     min_disk: 10
+    replace_frequency: "quarterly"
+    description:
+      - "https://docs.rockylinux.org/release_notes/"
+      - "MAJOR"
+      - "_"
+      - "MINOR"
     releases:
-      - name: '8'
-        codename: "Green Obsidian"
-        baseURL: "https://download.rockylinux.org/pub/rocky/8/"
-        releasepath: "images/x86_64"
-        image:
-          distro: "Rocky"
-          version: '8'
-          usage: "GenericCloud-Base"
-          arch: "x86_64"
-          extension: "qcow2"
-        checksum:
-          filename: "CHECKSUM"
-          algorithm: "sha256"
-        limit: 1
       - name: '9'
         codename: "Blue Onyx"
         baseURL: "https://download.rockylinux.org/pub/rocky/9/"

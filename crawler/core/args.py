@@ -28,18 +28,6 @@ def get_args(program_directory: str) -> Namespace:
         help="initialize image catalog database"
     )
     parser.add_argument(
-        "--export-only",
-        action="store_true",
-        required=False,
-        help="export only existing image catalog"
-    )
-    parser.add_argument(
-        "--updates-only",
-        action="store_true",
-        required=False,
-        help="check only for updates, do not export catalog"
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         required=False,
@@ -49,5 +37,24 @@ def get_args(program_directory: str) -> Namespace:
         "--branding-name",
         default="plusserver",
         help="branding name the logger displays"
+    )
+    update_exclusive_group = parser.add_mutually_exclusive_group(required=False)
+    update_exclusive_group.add_argument(
+        "--export-only",
+        action="store_true",
+        help="export only existing image catalog"
+    )
+    update_exclusive_group.add_argument(
+        "--updates-only",
+        action="store_true",
+        help="check only for updates, do not export catalog"
+    )
+    update_exclusive_group.add_argument(
+        "--crawl-back",
+        action="store_true",
+        help=(
+            "crawl for previous image releases defined by images limit param. "
+            "(default: 3)"
+        )
     )
     return parser.parse_args()

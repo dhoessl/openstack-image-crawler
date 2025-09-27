@@ -8,6 +8,7 @@ from datetime import datetime
 from os import path
 
 from crawler.web.generic import url_get_last_modified, url_fetch_links
+from crawler.updater.checksum import Checksum
 from crawler.updater.pattern import (
     get_filename_pattern, get_release_folder_pattern
 )
@@ -21,8 +22,7 @@ class MetadataBase:
         self.distribution_release = None  # release["name"]
         self.distribution_name = None  # source["name"]
         self.release_name = None  # f"{distribution_name} {image_name}"
-        self.checksum = None  # current checksum of this release
-        self.checksum_url = None  # url to current checksum file
+        self.checksum = None  # Checksum Object
         self.url = None  # url pointing to release download
         self.major = None  # major release version
         self.minor = None  # minor release version
@@ -30,6 +30,8 @@ class MetadataBase:
         self.release_date = None  # release date in %Y-%m-%d
         self.release_date_suffix = None  # release date suffix
         self.version = None  # release_date in %Y%m%d
+        self.arch = None  # release['arch']
+        self.description = None  # Some sort of image description
 
     def _format_release_date(self) -> None:
         """ formate the release date into %Y-%m-%d """
@@ -47,19 +49,21 @@ class Metadata(MetadataBase):
         data will be fetched from provided information
     """
     def __init__(
-        self, release_url: str, base_url: str,
-        image_data: dict, distribution_name: str, image_name: str,
-        checksum: str
+        self, release: dict, release_url: str, distribution_name: str,
+        checksum: Checksum, description: str | list, codename: str
     ) -> None:
         """ create all possible metadata vars """
         super.__init__()
-        self.base_url = base_url
         self.release_url = release_url
-        self.image_data = image_data
-        self.distribution_release = image_name  # release["name"]
+        self.base_url = release["baseURL"]
+        self.image_data = release["image"]
+        self.distribution_release = release["name"]
         self.distribution_name = distribution_name  # source["name"]
-        self.release_name = f"{distribution_name} {image_name}"
-        self.checksum = checksum
+        self.release_name = f"{distribution_name} {release['image']['name']}"
+        self.checksum = checksum  # Checksum Object holding all checksum data
+        self.arch = release["image"]["arch"]
+        self.description = description
+        self.codename = codename
         self.log_prefix = \
             f"{self.distribution_name}({self.image_data['version']})"
         self.filename_pattern = get_filename_pattern(
@@ -77,11 +81,37 @@ class Metadata(MetadataBase):
             extract = self._get_dated_extract()
         # Check if extract holds data
         if not extract:
-            # return False to later check if extraction worked
+            # extraction did not work logger should already printed info
             return False
         # set metadata
         self._set_metadata_from_extract(extract)
+        # When metadata was fetched we can build description
+        # since it might depend on image versions
+        self._convert_description()
         return True
+
+    def _convert_description(self) -> None:
+        """ convert release["description"] list or string into metadata var """
+        if type(self.description) is str:
+            # description is in the correct format and does not need to be
+            # converted
+            return None
+        description = ""
+        supported_vars = ["CODENAME", "MAJOR", "MINOR"]
+        for element in self.description:
+            if element not in supported_vars:
+                # Add the string to description if the element does not
+                # include a supported variable.
+                description += element
+                continue
+            # If there are more vars required add them here
+            if element == "CODENAME":
+                description += self.codename
+            elif element == "MAJOR":
+                description += str(self.major)
+            elif element == "MINOR":
+                description += str(self.minor)
+        self.description = description
 
     def _get_dated_extract(self) -> re.Match:
         """ Search for the latest dated release folder by a given pattern.
@@ -160,7 +190,7 @@ class Metadata(MetadataBase):
                 f"{self.log_prefix} extracting is not implemented!"
             )
 
-    def _get_latest_release_folder(self, url: str, pattern: re.Pattern) -> str:
+    def _get_latest_release_folder(self, url: str) -> str:
         """ find a folder depending on a given pattern and return the locaiton
         """
         # fetch all links from given url

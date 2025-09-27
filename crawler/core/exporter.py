@@ -11,8 +11,7 @@ from crawler.core.database import Database
 class Exporter:
     def __init__(
         self, database: Database, image_source_catalog: dict,
-        image_update_catalog: list, repository: str,
-        template_path: str
+        image_update_catalog: dict, repository: str, template_path: str
     ) -> None:
         # Database Object to use the sqlite3 database
         self.database = database

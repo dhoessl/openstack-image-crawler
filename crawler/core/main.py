@@ -11,7 +11,7 @@ def crawl_back_image_sources(
 ) -> dict:
     updated_sources = {}
     for source in image_source_catalog["sources"]:
-        logger.info("Checking updates for Distribution {source['name']}")
+        logger.info("Crawl releases for Distribution {source['name']}")
         updated_releases = image_crawl_back_service(database, source)
         if updated_releases:
             updated_sources[source["name"]] = {}

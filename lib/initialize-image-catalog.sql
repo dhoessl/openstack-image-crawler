@@ -7,5 +7,7 @@ CREATE TABLE IF NOT EXISTS image_catalog (
   distribution_release text,
   url text,
   checksum text,
-  checksum_url text
+  checksum_url text,
+  arch text,
+  description text
 );

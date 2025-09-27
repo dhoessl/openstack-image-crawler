@@ -90,33 +90,65 @@ class Database:
         logger.info("New database created at {self.database_path}")
 
     def get_last_checksum(
-        self, distribution: str, release: str
-    ) -> str:
+        self, distribution: str, release: str, limit: int = 1
+    ) -> str | list:
         """ Fetches the last checksum from database for a given release """
         query = (
-            "SELECT checksum FROM image_catalog"
-            "WHERE distribution_name = ?"
-            "AND distribution_release = ?"
-            "ORDER BY id DESC LIMIT 1"
+            "SELECT checksum FROM image_catalog "
+            "WHERE distribution_name = ? "
+            "AND distribution_release = ? "
+            "ORDER BY id DESC LIMIT ?"
         )
-        params = (distribution, release)
+        params = (distribution, release, limit)
         cursor = self.execute_query(query, params, False, "Checksum")
-        row = cursor.fetchone()
+        rows = cursor.fetchall()
         cursor.close()
-        if not row:
+        if not rows:
             logger.debug(
                 "No previous Checksum found for {distribution} {release}"
             )
             return None
+        elif len(rows) == 1:
+            return rows[0][0]
         else:
-            return row[0]
+            checksum_list = []
+            for row in rows:
+                checksum_list.append(row[0])
+            return checksum_list
+
+    def get_last_checksum_by_version(
+        self, distribution: str, release: str, limit: int = 1
+    ) -> list:
+        query = (
+            "SELECT checksum, version FROM image_catalog "
+            "WHERE distribution_name = ? "
+            "AND distribution_release = ? "
+            "ORDER BY id DESC LIMIT ?"
+        )
+        params = (distribution, release, limit)
+        cursor = self.execute_query(query, params, False, "Checksum versions")
+        rows = cursor.fetchall()
+        cursor.close()
+        checksum_list = []
+        if not rows:
+            logger.debug(
+                "No previous Checksums found for {distribution} {release}"
+            )
+            return checksum_list
+        for row in rows:
+            checksum_list.append({
+                "checksum": row[0],
+                "version": row[1]
+            })
+        return checksum_list
 
     def get_release_versions(
         self, distribution: str, release: str, limit: int = 1
     ) -> list:
         query = (
             "SELECT name, release_date, version, distribution_name, "
-            "distribution_release, url, checksum, checksum_url "
+            "distribution_release, url, checksum, checksum_url, arch, "
+            "description "
             "FROM image_catalog "
             "WHERE distribution_name = ? "
             "AND distribution_release = ? "
@@ -142,6 +174,8 @@ class Database:
             metadata.url = row[5]
             metadata.checksum = row[6]
             metadata.checksum_url = row[7]
+            metadata.arch = row[8]
+            metadata.description = row[9]
             metadata_list.append(metadata)
         return metadata_list
 
@@ -153,7 +187,7 @@ class Database:
             release version
         """
         query = (
-            "SELECT version, checksum, url, release_date"
+            "SELECT version, checksum, url, release_date "
             "FROM image_catalog "
             "WHERE distribution_name = ? "
             "AND distribution_release = ? "
@@ -185,13 +219,15 @@ class Database:
         query = (
             "INSERT INTO image_catalog "
             "(name, release_date, version, distribution_name, "
-            "distribution_release, url, checksum, checksum_url) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)"
+            "distribution_release, url, checksum, checksum_url, arch, "
+            "description) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )
         params = (
-            metadata.release_name, metadata.release_date,
+            metadata.release_name, metadata.release_date, metadata.version,
             metadata.distribution_name, metadata.distribution_release,
-            metadata.url, metadata.checksum, metadata.checksum_url
+            metadata.url, metadata.checksum.latest,
+            metadata.checksum.url, metadata.arch, metadata.description
         )
         self.execute_query(query, params, commit=True, caller="write entry")
 
@@ -203,8 +239,8 @@ class Database:
             "WHERE name=? AND version=?"
         )
         params = (
-            metadata.url, metadata.checksum, metadata.release_date,
-            metadata.checksum_url, metadata.release_name, metadata.version
+            metadata.url, metadata.checksum.latest, metadata.release_date,
+            metadata.checksum.url, metadata.release_name, metadata.version
         )
         self.execute_query(query, params, commit=True, caller="update entry")
 
@@ -227,15 +263,23 @@ class Database:
             "PRAGMA table_info(image_catalog)", caller="Updater"
         )
         table_info = table_info_cursor.fetchall()
+        columns_to_create = ["checksum_url", "arch", "description"]
         for row in table_info:
-            if row[1] == "checksum_url":
-                return None
+            if row[1] in columns_to_create:
+                columns_to_create.pop(columns_to_create.index(row[1]))
+        if not columns_to_create:
+            # Exist if all new columns exist
+            return None
         logger.warning(
-            "Updating Database Table. Adding checksum_url column"
+            "Updating Database Table. Adding missing columns "
+            f"({', '.join(columns_to_create)})"
         )
-        self.execute_query(
-            "ALTER TABLE image_catalog ADD checksum_url text",
-            commit=True, caller="checksum_url upgrade"
-        )
+        for column in columns_to_create:
+            # sqlite3 does not allow subsitution for column names
+            # this is why f-string is used here.
+            # This should be no issue since there cant be code injected at
+            # this point and just pre-defined column names are created
+            query = f"ALTER TABLE image_catalog ADD COLUMN {column} text"
+            self.execute_query(query, commit=True, caller="Column Upgrade")
         logger.info("Table update finished")
-        # TODO: pull all releases and add checksum_url
+        # TODO: pull all releases and fill missing data

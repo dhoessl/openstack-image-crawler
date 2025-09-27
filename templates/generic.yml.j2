@@ -7,24 +7,24 @@ images:
     login: "{{ distribution_config['default_login'] |default(distribution_config['name'] |lower |replace(' ', '_')) }}"
     min_disk: {{ distribution_config['min_disk'] |defalt(8) }}
     min_ram: {{ distribution_config['min_ram'] |default(512) }}
-    status: "{{ release_config[release]['image_config']['status'] |default('active') }}"
-    visibility: "{{ release_config[release]['image_config']['visibility'] |default('public') }}"
-    multi: {{ release_config[release]['image_config']['multi'] |default(true) }}
-    tags: {{ release_config[release]['image_config']['tags'] |default([]) }}
+    status: "{{ distribution_config['image_status'] |default('active') }}"
+    visibility: "{{ distribution_config['visibility'] |default('public') }}"
+    multi: {{ distribution_config['multi'] |default(true) }}
+    tags: {{ distribution_config['tags'] |default([]) }}
     meta:
-      architecture: "{{ release_config[release]['image']['arch'] |default('x86_64') }}"
-      hypervisor_type: "{{ release_config[release]['image_meta']['hypervisor_type'] |default('qemu') }}"
-      hw_disk_bus: "{{ release_config[release]['image_meta']['hw_disk_bus'] |default('scsi') }}"
-      hw_rng_model: "{{ release_config[release]['image_meta']['hw_rng_model'] |default('virtio') }}"
-      hw_scsi_model: "{{ release_config[release]['image_meta']['hw_scsi_model'] |default('virtio-scsi') }}"
-      hw_qemu_guest_agent: {{ release_config[release]['image_meta']['hw_qemu_guest_agent'] |default(true) }}
-      hw_watchdog_action: "{{ release_config[release]['image_meta']['hw_watchdog_action'] |default('reset') }}"
-      replace_frequency: "{{ release_config[release]['image_meta']['replace_frequency'] |default('monthly') }}"
-      hotfix_hours: "{{ release_config[release]['image_meta']['hotfix_hours'] |default('0') }}"
-      uuid_validity: "{{ release_config[release]['image_meta']['uuid_validity'] |default('last-3') }}"
-      provided_until: {{ release_config[release]['image_meta']['provided_until'] |default('none') }}
-      os_distro: "{{ distribution[release][0].distribution_name |lower }}"
-      os_version: "{{ distribution[release][0].distribution_release }}"
+      architecture: "{{ latest[release].arch |default('x86_64') }}"
+      hypervisor_type: "{{ distribution_config['hypervisor_type'] |default('qemu') }}"
+      hw_disk_bus: "{{ distribution_config['hw_disk_bus'] |default('scsi') }}"
+      hw_rng_model: "{{ distribution_config['hw_rng_model'] |default('virtio') }}"
+      hw_scsi_model: "{{ distribution_config['hw_scsi_model'] |default('virtio-scsi') }}"
+      hw_qemu_guest_agent: {{ distribution_config['hw_qemu_guest_agent'] |default(true) }}
+      hw_watchdog_action: "{{ distribution_config['hw_watchdog_action'] |default('reset') }}"
+      replace_frequency: "{{ distribution_config['replace_frequency'] |default('monthly') }}"
+      hotfix_hours: "{{ distribution_config['hotfix_hours'] |default('0') }}"
+      uuid_validity: "{{ distribution_config['uuid_validity'] |default('last-3') }}"
+      provided_until: {{ distribution_config['provided_until'] |default('none') }}
+      os_distro: "{{ latest[release].distribution_name |lower }}"
+      os_version: "{{ latest[release].distribution_release }}"
     latest_checksum_url: "{{ latest[release].checksum_url }}"
     latest_url: "{{ latest[release].url }}"
     versions:
@@ -34,7 +34,7 @@ images:
         checksum: "{{ version.checksum }}"
         build_date: "{{ version.release_date }}"
         image_source: "{{ version.url }}"
-        image_description: "{{ distribution_config['image_description'] |default('') }}"
+        image_description: "{{ version.description |default('') }}"
 {% endfor -%}
 {% endfor %}
 ...

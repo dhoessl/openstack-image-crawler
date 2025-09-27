@@ -1,92 +1,29 @@
 # service.py
 
 # providing core functionality for the crawler in updating and crawling images
+
+from os import path
 from loguru import logger
 
 from crawler.core.database import Database
-# from crawler.updater.ubuntu import ubuntu_update_check, ubuntu_crawl_release
-# from crawler.updater.debian import debian_update_check, debian_crawl_release
-# from crawler.updater.alma import alma_update_check
-# from crawler.updater.flatcar import flatcar_update_check
-# from crawler.updater.fedora import fedora_update_check, fedora_crawl_release
-# from crawler.updater.rocky import rocky_update_check
+from crawler.updater.update_check import (
+    ImageUpdateChecker,
+    ImageUpdateCrawler
+)
+from crawler.updater.pattern import get_release_folder_pattern
+from crawler.web.generic import url_fetch_links
 
-from crawler.updater.update_check import ImageUpdateChecker
-
-
-# def image_crawl_back_service(connection, source):
-#     for release in source["releases"]:
-#         catalog_entry_list = []
-#         if "ubuntu" in release["imagename"]:
-#             catalog_entry_list = ubuntu_crawl_release(release)
-#         elif "debian" in release["imagename"]:
-#             catalog_entry_list = debian_crawl_release(release)
-#         elif "Fedora" in release["imagename"]:
-#             catalog_entry_list = fedora_crawl_release(release)
-#         else:
-#             # fall back for distributions with only latest release online
-#             # or yet unsupported distribution
-#             last_checksum = db_get_last_checksum(
-#                     connection, source["name"], release["name"]
-#                 )
-#             if "Alma" in release["imagename"]:
-#                 logger.warning("Only the last Alma Linux release is online" +
-#                                " - falling back to normal update service")
-#                 catalog_entry = alma_update_check(release, last_checksum)
-#                 if catalog_entry:
-#                     catalog_entry_list.append(catalog_entry)
-#             elif "flatcar" in release["imagename"]:
-#                 logger.warning("Crawling of previous Flatcat Linux versions" +
-#                                " not yet supported - falling back to normal" +
-#                                " update service")
-#                 catalog_entry = flatcar_update_check(release, last_checksum)
-#                 if catalog_entry:
-#                     catalog_entry_list.append(catalog_entry)
-#             # elif "Fedora" in release["imagename"]:
-#             #     logger.warning("Crawling of previous Fedora Linux versions" +
-#             #                    " not yet supported - falling back to normal" +
-#             #                    " update service")
-#             #     catalog_entry = fedora_update_check(release, last_checksum)
-#             #     if catalog_entry:
-#             #         catalog_entry_list.append(catalog_entry)
-#             elif "Rocky" in release["imagename"]:
-#                 logger.warning("Crawling of previous Rocky Linux version" +
-#                                " not yet supported - falling back to normal" +
-#                                " update service")
-#                 catalog_entry = rocky_update_check(release, last_checksum)
-#                 if catalog_entry:
-#                     catalog_entry_list.append(catalog_entry)
-#             else:
-#                 # not yet supported distribution
-#                 logger.warning("Crawling versions of distribution " + source["name"] +
-#                             " not (yet) supported")
-#
-#         if catalog_entry_list:
-#             logger.info("Versions found for " + source["name"] + " " + release["name"])
-#             for catalog_entry in catalog_entry_list:
-#                 # catalog_entry anreichern mit _allen_ Daten für die DB
-#                 catalog_entry["distribution_name"] = source["name"]
-#                 if "Fedora" in release["imagename"]:
-#                     logger.info("Version found " + catalog_entry["release_id"])
-#                     catalog_entry["name"] = source["name"] + " " + catalog_entry["release_id"]
-#                     catalog_entry["distribution_release"] = catalog_entry["release_id"]
-#                 else:
-#                     logger.info("Version found " + catalog_entry["version"])
-#                     catalog_entry["name"] = source["name"] + " " + release["name"]
-#                     catalog_entry["distribution_release"] = release["name"]
-#                 catalog_entry["release"] = release["name"]
-#
-#                 write_or_update_catalog_entry(connection, catalog_entry)
-#                 # Commit message or just "initial commit"
-#                 # catalog_entry_list.append(release["name"])
+from crawler.updater.ubuntu import ubuntu_crawl_release
+from crawler.updater.debian import debian_crawl_release
 
 
-def image_update_service(database: Database, source: dict) -> dict:
+def image_update_service(database: Database, source: dict) -> list:
     updated_releases = []
     for release in source["releases"]:
         # Check if release is supported. If its no supported exception will be
         # raised.
         check_release(release["image"]["distro"], source["name"])
+        # Fetch last saved checksum
         last_checksum = database.get_last_checksum(
             source["name"], release["name"]
         )
@@ -95,16 +32,19 @@ def image_update_service(database: Database, source: dict) -> dict:
             last_checksum = f"{release['checksum']['algorithm']}:none"
         logger.debug("last_checksum:" + last_checksum)
         # create Updater Object and run an update check
-        updater = ImageUpdateChecker(source["name"], release, last_checksum)
-        updater.check_update()
-        if updater.update_available:
+        updater = ImageUpdateChecker(
+            source["name"], source["description"], release,
+            last_checksum, source["codename"]
+        )
+        if updater.is_update_available():
+            metadata = updater.get_metadata()
             # Update is available
             logger.info(
                 f"{source['name']} - {release['name']} updated image found. "
-                f"New release {updater.update['version']}"
+                f"New release {metadata.version}"
             )
             # write changes to db
-            database.write_or_update_catalog_entry(updater.metadata)
+            database.write_or_update_catalog_entry(metadata)
             # mark changes to be processed later
             updated_releases.append(release["name"])
         else:
@@ -113,6 +53,57 @@ def image_update_service(database: Database, source: dict) -> dict:
             )
     # return changes
     return updated_releases
+
+
+def image_crawl_back_service(database: Database, source: dict) -> list:
+    # TODO: This must be rebuild later to replace historian.py
+    # Check if distros support crawlback or crawlback is implemented
+    if source["name"] in ["AlmaLinux", "RockyLinux", "Fedora"]:
+        logger.info(
+            f"Only latest image available for {source['name']}."
+        )
+        if source["name"] == "Fedora":
+            logger.info(
+                "If you want to crawl Fedoras Major Versions, just add "
+                "them by hand for consistent behaviour"
+            )
+        logger.info("Starting normal update")
+        # just do normal update service and return its output
+        return image_update_service(database, source)
+    if source["name"] == "Flatcar":
+        logger.info(
+            "Flatcar crawlback currently not implemented. "
+            "Starting normal Update update"
+        )
+        # just do normal update service and return its output
+        return image_update_service(database, source)
+    # Starting crawlback here
+    updated_releases = []
+    for release in source["releases"]:
+        check_release(release["image"]["distro"], source["name"])
+        # Set limit to default (3) if no limit is set
+        release["limit"] = release["limit"] if "limit" in release else 3
+        release_version_paths = get_crawl_back_release_paths(release)
+        # TODO: check if links are found
+        # Create Crawlback updater object
+        for version in release_version_paths:
+            crawler = ImageUpdateCrawler(
+                source["name"], source["description"], release,
+                source["codename"], version
+            )
+        crawler.todo()
+        if "ubuntu" == release["image"]["distro"]:
+            catalog_entry_list = ubuntu_crawl_release(release)
+        elif "debian" == release["image"]["distro"]:
+            catalog_entry_list = debian_crawl_release(release)
+        if not catalog_entry_list:
+            logger.warning(
+                f"No Version found for {source['name']} {release['name']}"
+            )
+            return []
+        logger.info(f"Versions found for {source['name']} {release['name']}")
+        # TODO: Create some output whatever
+        return updated_releases
 
 
 def check_release(image_distro: str, source_name: str) -> None:
@@ -124,3 +115,24 @@ def check_release(image_distro: str, source_name: str) -> None:
             f"Unsupported distribution {source_name}"
             " => Please check your images-sources.yaml. Skipping Releases."
         )
+
+
+def get_crawl_back_release_paths(release_data: dict) -> list:
+    """ Checks provided base url for release versions and returns links for
+        amount of {release['image']['limit']}
+    """
+    release_urls = []
+    links = url_fetch_links(release_data["baseURL"])
+    pattern = get_release_folder_pattern(
+        release_data["image"],
+        f"{release_data['image']['distro']} {release_data['image']['version']}"
+    )
+    while links:
+        link = links.pop()
+        location = link.get("href")
+        if pattern.search(location):
+            release_urls.append(path.join(release_data["baseURL"], location))
+        if len(release_urls) == release_data["limit"]:
+            # Stop search if enough releases found
+            break
+    return release_urls
