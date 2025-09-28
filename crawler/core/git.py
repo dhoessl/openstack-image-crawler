@@ -2,9 +2,8 @@ import git
 import os
 from loguru import logger
 from pathlib import Path
-from sqlite3 import Connection
 
-from crawler.core.database import db_get_release_versions
+from crawler.core.database import Database
 
 
 def clone_or_pull(
@@ -46,7 +45,7 @@ def clone_or_pull(
 
 
 def update_repository(
-    database: Connection, repository: str,
+    database: Database, repository: str,
     updated_sources: dict, ssh_command: str
 ) -> None:
     if ssh_command:
@@ -73,8 +72,8 @@ def update_repository(
         for source in updated_sources:
             for release in updated_sources[source]["releases"]:
                 logger.debug(f"get release version data for {source} {release}")
-                release_data = db_get_release_versions(
-                    database, source, release, 1
+                release_data = database.get_release_version(
+                    source, release, 1
                 )
                 if not release_data:
                     logger.warn("got no release version data")
