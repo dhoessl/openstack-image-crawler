@@ -2,7 +2,7 @@
 
 from os import path
 from loguru import logger
-from crawler.web.generic import url_fetch_links
+from crawler.core.web import url_fetch_links
 from crawler.updater.metadata import Metadata
 from crawler.updater.checksum import Checksum
 
@@ -31,7 +31,7 @@ class ImageUpdateBase:
             logger.debug("Update Possible")
             return True
 
-    def get_metadata(self) -> Metadata:
+    def get_metadata(self, crawling: bool = False) -> Metadata:
         """ builds metadata Object from Metadata class if not build before
             and returns it
         """
@@ -41,6 +41,7 @@ class ImageUpdateBase:
                 self.release, self.release_url, self.distribution_name,
                 self.checksum, self.description_base, self.codename
             )
+            self.metadata.build_metadata(crawling)
         return self.metadata
 
 
@@ -75,11 +76,11 @@ class ImageUpdateChecker(ImageUpdateBase):
             links = url_fetch_links(self.release["baseURL"])
             while links:
                 link = links.pop()
-                extract = search_pattern.search(link.get("href"))
+                extract = search_pattern.search(link)
                 if extract:
                     self.release_url = path.join(
                         self.release["baseURL"],
-                        link.get("href"),
+                        link,
                         self.release["releasepath"]
                     )
                     self.release["name"] == extract.group(1)
@@ -109,8 +110,9 @@ class ImageUpdateCrawler(ImageUpdateBase):
     def _setup_vars(self, release_path: str) -> None:
         self.release_url = release_path
         logger.debug(f"release_url: {self.release_url}")
+        old_checksum = f"{self.release['checksum']['algorithm']}:none"
         self.checksum = Checksum(
-            f"{self.release['checksum']['algorithm']}:none", self.release_url,
-            self.release["checksum"], self.release["image"]
+            old_checksum, self.release_url, self.release["checksum"],
+            self.release["image"]
         )
         logger.debug("current checksum: {self.checksum.latest}")

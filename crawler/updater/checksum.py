@@ -5,7 +5,7 @@ import re
 from os import path
 from loguru import logger
 
-from crawler.web.generic import url_fetch_links, url_fetch_content
+from crawler.core.web import url_fetch_links, url_fetch_content
 from crawler.updater.pattern import (
     get_checksum_search_pattern, get_checksum_pattern
 )

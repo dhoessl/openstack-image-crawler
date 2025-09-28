@@ -7,7 +7,7 @@ from loguru import logger
 from datetime import datetime
 from os import path
 
-from crawler.web.generic import url_get_last_modified, url_fetch_links
+from crawler.core.web import url_get_last_modified, url_fetch_links
 from crawler.updater.checksum import Checksum
 from crawler.updater.pattern import (
     get_filename_pattern, get_release_folder_pattern
@@ -48,6 +48,9 @@ class Metadata(MetadataBase):
     """ provides vars for all available metadata.
         data will be fetched from provided information
     """
+    SIMPLE_EXTRACT_DISTRO = ["AlmaLinux", "Rocky", "Fedora"]
+    DATED_EXTRACT_DISTRO = ["ubuntu", "debian", "flatcar"]
+
     def __init__(
         self, release: dict, release_url: str, distribution_name: str,
         checksum: Checksum, description: str | list, codename: str
@@ -70,15 +73,27 @@ class Metadata(MetadataBase):
             self.image_data, self.log_prefix
         )  # function from crawler/updater/pattern.py
 
-    def build_metadata(self) -> bool:
+    def build_metadata(self, crawling: bool = False) -> bool:
         """ fetch image name and build metadata from _self_ values and image
             name
         """
         # call specific function for extraction
-        if self.image_data["distro"] in ["AlmaLinux", "Rocky", "Fedora"]:
+        if self.image_data["distro"] in Metadata.SIMPLE_EXTRACT_DISTRO:
             extract = self._get_simple_extract()
-        elif self.image_data["distro"] in ["ubuntu", "debian", "flatcar"]:
+        elif (
+            crawling
+            and self.image_data["distro"] in Metadata.DATED_EXTRACT_DISTRO
+        ):
+            # self.release_url is already set by crawler
+            extract = self._get_simple_extract()
+        elif self.image_data["distro"] in Metadata.DATED_EXTRACT_DISTRO:
+            # fetch self.release_url from release page before doing a simple
+            # extract
             extract = self._get_dated_extract()
+        else:
+            raise RuntimeError(
+                f"could not map {self.image_data['distro']} to a function"
+            )
         # Check if extract holds data
         if not extract:
             # extraction did not work logger should already printed info
@@ -200,8 +215,7 @@ class Metadata(MetadataBase):
         # and check if its a match for a release foldern described by
         # the pattern
         while links:
-            link = links.pop()  # get last link
-            location = link.get("href")  # get target location
+            location = links.pop()  # get last link
             if pattern.search(location):
                 # if location and pattern matches return the location
                 return location

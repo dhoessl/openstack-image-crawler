@@ -66,8 +66,9 @@ def get_release_folder_pattern(image_data: dict, log_prefix: str) -> re.Pattern:
         # Example: 20250909-2230/
         return re.compile(r".*?(\d{8})-(\d+)\/$")
     elif image_data["distro"] == "ubuntu":
-        # Example: 20250801-2191/
-        return re.compile(r".*?release-(\d{8})\/$")
+        # Example: release-20250801/
+        # Example: release-20250801.1/
+        re.compile(r".*?release-((\d{8})|(\d{8}\.\d))\/$")
     else:
         raise RuntimeError(
             f"{log_prefix} folder pattern not implemented!"

@@ -6,15 +6,12 @@ from os import path
 from loguru import logger
 
 from crawler.core.database import Database
+from crawler.core.web import url_fetch_links
 from crawler.updater.update_check import (
     ImageUpdateChecker,
     ImageUpdateCrawler
 )
 from crawler.updater.pattern import get_release_folder_pattern
-from crawler.web.generic import url_fetch_links
-
-from crawler.updater.ubuntu import ubuntu_crawl_release
-from crawler.updater.debian import debian_crawl_release
 
 
 def image_update_service(database: Database, source: dict) -> list:
@@ -56,7 +53,6 @@ def image_update_service(database: Database, source: dict) -> list:
 
 
 def image_crawl_back_service(database: Database, source: dict) -> list:
-    # TODO: This must be rebuild later to replace historian.py
     # Check if distros support crawlback or crawlback is implemented
     if source["name"] in ["AlmaLinux", "RockyLinux", "Fedora"]:
         logger.info(
@@ -70,13 +66,6 @@ def image_crawl_back_service(database: Database, source: dict) -> list:
         logger.info("Starting normal update")
         # just do normal update service and return its output
         return image_update_service(database, source)
-    if source["name"] == "Flatcar":
-        logger.info(
-            "Flatcar crawlback currently not implemented. "
-            "Starting normal Update update"
-        )
-        # just do normal update service and return its output
-        return image_update_service(database, source)
     # Starting crawlback here
     updated_releases = []
     for release in source["releases"]:
@@ -84,25 +73,16 @@ def image_crawl_back_service(database: Database, source: dict) -> list:
         # Set limit to default (3) if no limit is set
         release["limit"] = release["limit"] if "limit" in release else 3
         release_version_paths = get_crawl_back_release_paths(release)
-        # TODO: check if links are found
         # Create Crawlback updater object
-        for version in release_version_paths:
+        for version_path in release_version_paths:
+            # create crawler, build metadata and write to database
             crawler = ImageUpdateCrawler(
                 source["name"], source["description"], release,
-                source["codename"], version
+                source["codename"], version_path
             )
-        crawler.todo()
-        if "ubuntu" == release["image"]["distro"]:
-            catalog_entry_list = ubuntu_crawl_release(release)
-        elif "debian" == release["image"]["distro"]:
-            catalog_entry_list = debian_crawl_release(release)
-        if not catalog_entry_list:
-            logger.warning(
-                f"No Version found for {source['name']} {release['name']}"
-            )
-            return []
-        logger.info(f"Versions found for {source['name']} {release['name']}")
-        # TODO: Create some output whatever
+            database.write_or_update_catalog_entry(crawler.get_metadata())
+            # add release name to updated_releases for later processing
+            updated_releases.append(release["name"])
         return updated_releases
 
 
@@ -119,7 +99,7 @@ def check_release(image_distro: str, source_name: str) -> None:
 
 def get_crawl_back_release_paths(release_data: dict) -> list:
     """ Checks provided base url for release versions and returns links for
-        amount of {release['image']['limit']}
+        amount of release_data['limit']
     """
     release_urls = []
     links = url_fetch_links(release_data["baseURL"])
@@ -128,8 +108,7 @@ def get_crawl_back_release_paths(release_data: dict) -> list:
         f"{release_data['image']['distro']} {release_data['image']['version']}"
     )
     while links:
-        link = links.pop()
-        location = link.get("href")
+        location = links.pop()
         if pattern.search(location):
             release_urls.append(path.join(release_data["baseURL"], location))
         if len(release_urls) == release_data["limit"]:

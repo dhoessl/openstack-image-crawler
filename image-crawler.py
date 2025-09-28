@@ -7,7 +7,7 @@
 # and image url
 #
 # 2023-06-11 v0.4.0 christian.stelter@plusserver.com
-# 2025-09-24 v0.5.0 dominic.hoessl@gmail.com
+# 2025-09-24 v0.5.0 dominichoessl@gmail.com
 
 import sys
 import os
@@ -17,7 +17,7 @@ from crawler.core.config import config_read
 from crawler.core.database import Database
 from crawler.core.exporter import Exporter
 from crawler.core.main import crawl_image_sources, crawl_back_image_sources
-from crawler.git.base import clone_or_pull, update_repository
+from crawler.core.git import clone_or_pull, update_repository
 
 
 def define_logger(debug: bool, branding: str) -> None:
@@ -70,6 +70,20 @@ def clone_or_update_repo(config: dict, git_ssh_command) -> str:
     )
 
 
+def update_remote_repository(
+    config: dict, updated_sources: dict, database: Database,
+    git_ssh_command: str
+) -> None:
+    if "remote_repository" in config and updated_sources:
+        update_repository(
+            database, config["local_repository"],
+            updated_sources, git_ssh_command
+        )
+        logger.info("Remote repository updated")
+    else:
+        logger.info("No remote repository update needed!")
+
+
 def main() -> None:
     program_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -118,13 +132,9 @@ def main() -> None:
         logger.info("Start repository crawling")
         updated_sources = crawl_image_sources(image_source_catalog, database)
         logger.info("Only Updates - No catalog export")
-        if "remote_repository" in config and updated_sources:
-            update_repository(
-                database, config["local_repository"],
-                updated_sources, git_ssh_command
-            )
-        else:
-            logger.info("No remote repository update needed!")
+        update_remote_repository(
+            config, updated_sources, database, git_ssh_command
+        )
     elif args.export_only:
         # Only Export existing config to files
         logger.info("Export Only - Skip repository crawling")
@@ -140,6 +150,15 @@ def main() -> None:
         updated_sources = crawl_back_image_sources(
             image_source_catalog, database
         )
+        exporter = Exporter(
+            database, image_source_catalog, updated_sources,
+            config["local_repository"], config["template_path"]
+        )
+        logger.info(f"Exporting catalog to {export_path}")
+        exporter.export_image_catalog()
+        update_remote_repository(
+            config, updated_sources, database, git_ssh_command
+        )
     else:
         # no switches from update_exclusive_group
         # do the normal image update
@@ -151,13 +170,9 @@ def main() -> None:
         )
         logger.info(f"Exporting catalog to {export_path}")
         exporter.export_image_catalog()
-        if "remote_repository" in config and updated_sources:
-            update_repository(
-                database, config["local_repository"],
-                updated_sources, git_ssh_command
-            )
-        else:
-            logger.info("No remote repository update needed!")
+        update_remote_repository(
+            config, updated_sources, database, git_ssh_command
+        )
     database.disconnect()
 
 
