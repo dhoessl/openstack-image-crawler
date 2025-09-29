@@ -143,6 +143,10 @@ def main() -> None:
         exporter.export_all_images()
     elif args.crawl_back:
         # Crawl back images up to the limit defined for an image
+        # TODO: Currently not working!
+        logger.error("Crawl back currently not implemented")
+        database.disconnect()
+        return None
         logger.info("Start historic repository crawling")
         updated_sources = crawl_back_image_sources(
             image_source_catalog, database
