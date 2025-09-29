@@ -4,6 +4,7 @@
 
 from os import path
 from loguru import logger
+from time import sleep
 
 from crawler.core.database import Database
 from crawler.core.web import url_fetch_links
@@ -31,7 +32,7 @@ def image_update_service(database: Database, source: dict) -> list:
         # create Updater Object and run an update check
         updater = ImageUpdateChecker(
             source["name"], source["description"], release,
-            last_checksum, source["codename"]
+            last_checksum
         )
         if updater.is_update_available():
             metadata = updater.get_metadata()
@@ -78,11 +79,12 @@ def image_crawl_back_service(database: Database, source: dict) -> list:
             # create crawler, build metadata and write to database
             crawler = ImageUpdateCrawler(
                 source["name"], source["description"], release,
-                source["codename"], version_path
+                version_path
             )
             database.write_or_update_catalog_entry(crawler.get_metadata())
             # add release name to updated_releases for later processing
             updated_releases.append(release["name"])
+            sleep(2)
         return updated_releases
 
 

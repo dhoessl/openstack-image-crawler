@@ -20,8 +20,10 @@ class Database:
         """
         if (
                 not self.init
-                and not path.exists(self.database_path)
-                or not path.isfile(self.database_path)
+                and (
+                    not path.exists(self.database_path)
+                    or not path.isfile(self.database_path)
+                )
         ):
             raise FileNotFoundError(
                 f"{self.database_path} not found! use '--init-db' to create "
@@ -54,8 +56,11 @@ class Database:
                 self.connect()
             cursor = self.connection.cursor()
             if params:
+                logger.debug(f"query: {query}")
+                logger.debug(f"params: {params}")
                 cursor.execute(query, params)
             else:
+                logger.debug(f"query: {query}")
                 cursor.execute(query)
             if commit:
                 self.connection.commit()
@@ -87,7 +92,7 @@ class Database:
             init_cmd = fp.read()
         self.connect()
         self.execute_query(init_cmd, caller="Init")
-        logger.info("New database created at {self.database_path}")
+        logger.info(f"New database created at {self.database_path}")
 
     def get_last_checksum(
         self, distribution: str, release: str, limit: int = 1
@@ -105,7 +110,7 @@ class Database:
         cursor.close()
         if not rows:
             logger.debug(
-                "No previous Checksum found for {distribution} {release}"
+                f"No previous Checksum found for {distribution} {release}"
             )
             return None
         elif len(rows) == 1:
@@ -160,7 +165,7 @@ class Database:
         cursor.close()
         if not data:
             logger.info(
-                "No release version found for {distribution} {release}"
+                f"No release version found for {distribution} {release}"
             )
             return None
         metadata_list = []
@@ -200,7 +205,7 @@ class Database:
         cursor.close()
         if not data:
             logger.info(
-                f"No dta was fetched for {distribution} {release} "
+                f"No data was fetched for {distribution} {release} "
                 f"version {version}"
             )
             return None

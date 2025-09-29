@@ -52,18 +52,23 @@ class Checksum:
             return None
         checksum_line_pattern = get_checksum_search_pattern(image_data)
         checksum_pattern = get_checksum_pattern(self.algorithm)
-        for line in checksum_list:
+        logger.debug(f"line_pattern: {checksum_line_pattern}")
+        logger.debug(f"checksum_patter: {checksum_pattern}")
+        for line in checksum_list.splitlines():
             if not checksum_line_pattern.search(line):
                 # Skip lines which not match image checksum pattern
                 continue
             # search for the checksum in the line matching the image
+            logger.debug(f"matching line: {line}")
             extract = checksum_pattern.search(line)
             if not extract:
                 # Checksum not found. Print error. set checksum to None
                 # will be later skipped in update check
                 logger.error("Checksum in line matching image not found")
                 return None
-            self.latest = extract.group(1)
+            self.latest = f"{self.algorithm}:{extract.group(1)}"
+            # checksum found -> exit function
+            break
 
     def _set_checksum_url(self, release_url: str, search: bool) -> None:
         """ builds checksum_url """

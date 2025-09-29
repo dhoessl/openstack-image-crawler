@@ -4,29 +4,32 @@ import validators
 from bs4 import BeautifulSoup
 from email.utils import parsedate_to_datetime
 from loguru import logger
+from time import sleep
 
 
 def url_do_request(url: str) -> requests.models.Response:
     if not validators.url(url):
         logger.error(f"{url} is not a valid URL")
         return None
-    try:
-        request = requests.get(url, allow_redirects=True)
-    except requests.exceptions.HTTPError as errh:
-        logger.error(f"HTTP error: {repr(errh)}")
-        return None
-    except requests.exceptions.ConnectionError as errc:
-        logger.error(f"could not connect to the API: {repr(errc)}")
-        return None
-    except requests.exceptions.Timeout as errt:
-        logger.error(f"timeout while connecting: {repr(errt)}")
-        return None
-    except requests.exceptions.RequestException as err:
-        logger.error(f"unknown error: {repr(err)}")
-        return None
+    for attempt in range(3):
+        try:
+            request = requests.get(url, allow_redirects=True, timeout=5)
+        except requests.exceptions.HTTPError as errh:
+            raise RuntimeError(f"HTTP error: {repr(errh)}")
+            return None
+        except requests.exceptions.ConnectionError as errc:
+            logger.error(f"could not connect to the API: {repr(errc)}")
+            sleep(2)
+        except requests.exceptions.Timeout as errt:
+            logger.error(f"timeout while connecting: {repr(errt)}")
+            sleep(2)
+        except requests.exceptions.RequestException as err:
+            raise RuntimeError(f"unknown error: {repr(err)}")
     if request.status_code == 404:
         logger.warning(f"Page not found. Error 404 => {url}")
         return None
+    if not request:
+        raise RuntimeError(f"Error while fetching {url}")
     return request
 
 

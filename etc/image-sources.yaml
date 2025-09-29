@@ -37,7 +37,6 @@ sources:
   - name: "Ubuntu Minimal"
     vendor: "Canonical Ltd."
     default_login: "ubuntu"
-    image_description: ""
     description:
       - "https://launchpad.net/ubuntu/"
       - "CODENAME"
@@ -72,7 +71,7 @@ sources:
 
   - name: "Debian"
     vendor: "Debian Community"
-    image_description:
+    description:
       - "https://www.debian.org/releases/"
       - "CODENAME"
       - "/release-notes"
@@ -103,7 +102,7 @@ sources:
         checksum:
           filename: "SHA512SUMS"
           algorithm: "sha512"
-      - name: "12"
+      - name: "13"
         codename: "trixie"
         baseURL: "https://cloud.debian.org/images/cloud/trixie/"
         releasepath: "latest"
@@ -119,7 +118,7 @@ sources:
 
   - name: "AlmaLinux"
     vendor: "AlmaLinux OS"
-    image_description:
+    description:
       - "https://wiki.almalinux.org/release-notes/"
       - "MAJOR"
       - "."
@@ -157,7 +156,7 @@ sources:
   - name: "Flatcar"
     vendor: "Kinvolk"
     default_login: "core"
-    image_description: "https://www.flatcar.org/releases"
+    description: "https://www.flatcar.org/releases"
     min_disk: 10
     releases:
       - name: "stable"
@@ -175,7 +174,6 @@ sources:
 
   - name: "Fedora"
     vendor: "Fedora Project"
-    image_description: ""
     min_disk: 4
     replace_frequency: "quarterly"
     uuid_validity: "last-1"
@@ -184,11 +182,13 @@ sources:
       - "MAJOR"
       - "/release-notes/"
     releases:
-      - name: '^(\d+).*?$'
+      - name: "latest"
+        latest_regex: "fedora_latest"
         codename: "none"
         baseURL: "https://ftp.plusline.net/fedora/linux/releases/"
         releasepath: "Cloud/x86_64/images"
         image:
+          latest: true
           distro: "Fedora"
           version: "latest"
           usage: "Cloud-Base-Generic"
@@ -217,7 +217,6 @@ sources:
 
   - name: "RockyLinux"
     vendor: "Rocky Linux Foundation"
-    image_description: ""
     min_disk: 10
     replace_frequency: "quarterly"
     description:

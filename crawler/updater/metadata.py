@@ -53,20 +53,21 @@ class Metadata(MetadataBase):
 
     def __init__(
         self, release: dict, release_url: str, distribution_name: str,
-        checksum: Checksum, description: str | list, codename: str
+        checksum: Checksum, description: str | list
     ) -> None:
         """ create all possible metadata vars """
-        super.__init__()
+        super().__init__()
         self.release_url = release_url
         self.base_url = release["baseURL"]
         self.image_data = release["image"]
         self.distribution_release = release["name"]
         self.distribution_name = distribution_name  # source["name"]
-        self.release_name = f"{distribution_name} {release['image']['name']}"
+        self.release_name = f"{distribution_name} {release['name']}"
         self.checksum = checksum  # Checksum Object holding all checksum data
-        self.arch = release["image"]["arch"]
+        self.arch = release["image"]["arch"] if "arch" in release["image"]\
+            else None
         self.description = description
-        self.codename = codename
+        self.codename = release["codename"]
         self.log_prefix = \
             f"{self.distribution_name}({self.image_data['version']})"
         self.filename_pattern = get_filename_pattern(
@@ -182,10 +183,10 @@ class Metadata(MetadataBase):
         elif self.image_data["distro"] == "ubuntu":
             self.version = self.url.split("/")[-2].split("-")[1]
             self.release_date = re.match(
-                r"^(\d{8})\.(\d+)?$", self.version
+                r"^(\d{8})(\.\d+){0,1}$", self.version
             ).group(1)
             self.release_date_suffix = re.match(
-                r"^(\d{8})\.(\d+)?$", self.version
+                r"^(\d{8})(\.\d+){0,1}$", self.version
             ).group(2)
             self._format_release_date()
         elif self.image_data["distro"] == "flatcar":
@@ -197,9 +198,9 @@ class Metadata(MetadataBase):
         elif self.image_data["distro"] == "Fedora":
             self.release_date = url_get_last_modified(self.url)
             self.version = self._get_version_from_date(self.release_date)
-            self.major = extract.group(2)
-            self.minor = extract.group(3)
-            self.patch = extract.group(4)
+            self.major = extract.group(1)
+            self.minor = extract.group(2)
+            self.patch = extract.group(3)
         else:
             raise RuntimeError(
                 f"{self.log_prefix} extracting is not implemented!"
@@ -211,6 +212,7 @@ class Metadata(MetadataBase):
         # fetch all links from given url
         links = url_fetch_links(url)
         pattern = get_release_folder_pattern(self.image_data, self.log_prefix)
+        logger.debug(f"release_folder_pattern: {pattern}")
         # loop every link on given page
         # and check if its a match for a release foldern described by
         # the pattern

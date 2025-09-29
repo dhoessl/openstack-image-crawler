@@ -23,16 +23,13 @@ from crawler.core.git import clone_or_pull, update_repository
 def define_logger(debug: bool, branding: str) -> None:
     log_level = "INFO"
     log_format = (
-        "<level>{message}</level>"
+        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}:{function}</cyan>:<cyan>{line}</cyan> "
+        "- <level>{message}</level>"
     )
     if debug:
         log_level = "DEBUG"
-        log_format = (
-            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-            "<level>{level: <8}</level> | "
-            "<cyan>{name}:{function}</cyan>:<cyan>{line}</cyan> "
-            "- <level>{message}</level>"
-        )
     logger.remove()
     logger.add(sys.stderr, format=log_format, level=log_level, colorize=True)
     # TODO: fetch version from somewhere
@@ -143,7 +140,7 @@ def main() -> None:
             config["local_repository"], config["template_path"]
         )
         logger.info(f"Exporting all catalog files to {export_path}")
-        exporter.export_image_catalog()
+        exporter.export_all_images()
     elif args.crawl_back:
         # Crawl back images up to the limit defined for an image
         logger.info("Start historic repository crawling")

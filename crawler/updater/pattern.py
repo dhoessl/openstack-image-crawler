@@ -11,6 +11,9 @@ def get_filename_pattern(image_data: dict, log_prefix: str) -> re.Pattern:
     """ Creates a regex pattern to match a specific image.
         If there is no image defined for image_data['distro'] an exception
         will be raised.
+        If there is {} in the regex set the statement on a single line, like
+        its for debian since f-string will format the statement as string
+        not as an regex statement as expected.
     """
     if image_data["distro"] in ["AlmaLinux", "Rocky"]:
         # Example: Rocky-8-GenericCloud-Base-8.10-20240528.0.x86_64.qcow2
@@ -27,7 +30,8 @@ def get_filename_pattern(image_data: dict, log_prefix: str) -> re.Pattern:
         return re.compile(
             fr"{image_data['distro']}-(\d+)-"
             fr"{image_data['usage']}-{image_data['arch']}-"
-            fr"((\d{8})-\d+)\.{image_data['extension']}$"
+            r"((\d{8})-\d+)"
+            fr"\.{image_data['extension']}$"
         )
     elif image_data["distro"] == "ubuntu":
         # Example: ubuntu-24.04-server-cloudimg-amd64.img
@@ -46,7 +50,7 @@ def get_filename_pattern(image_data: dict, log_prefix: str) -> re.Pattern:
         # Example: Fedora-Cloud-Base-Generic-42-1.1.x86_64.qcow2
         return re.compile(
             fr"{image_data['distro']}-{image_data['usage']}-"
-            fr"((\d+)-(\d+)\.(\d+)\.{image_data['arch']}\."
+            fr"(\d+)-(\d+)\.(\d+)\.{image_data['arch']}\."
             fr"{image_data['extension']}$"
         )
     else:
@@ -68,7 +72,7 @@ def get_release_folder_pattern(image_data: dict, log_prefix: str) -> re.Pattern:
     elif image_data["distro"] == "ubuntu":
         # Example: release-20250801/
         # Example: release-20250801.1/
-        re.compile(r".*?release-((\d{8})|(\d{8}\.\d))\/$")
+        return re.compile(r".*?release-((\d{8})|(\d{8}\.\d))\/$")
     else:
         raise RuntimeError(
             f"{log_prefix} folder pattern not implemented!"
@@ -132,3 +136,9 @@ def get_checksum_pattern(algorithm: str) -> re.Pattern:
     # Uses {{{...}}} to create a pattern like [A-Fa-f0-9]{64}
     # double { and } are used to escape { and } in f-strings
     return re.compile(fr".*?([A-Fa-f0-9]{{{checksum_length}}}).*?$")
+
+
+def get_latest_distribution_pattern(search: str) -> re.Pattern:
+    """ Searches by release['latest_regex'] for a pattern """
+    if search == "fedora_latest":
+        return re.compile(r"^(\d+).*?$")

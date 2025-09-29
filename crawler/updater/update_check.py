@@ -2,23 +2,31 @@
 
 from os import path
 from loguru import logger
+
 from crawler.core.web import url_fetch_links
 from crawler.updater.metadata import Metadata
 from crawler.updater.checksum import Checksum
+from crawler.updater.pattern import get_latest_distribution_pattern
 
 
 class ImageUpdateBase:
     def __init__(
         self, source_name: str, image_description: str | list,
-        release: dict, codename: str
+        release: dict
     ) -> None:
         self.release = release
         self.distribution_name = source_name
         self.description_base = image_description
-        self.codename = codename
         self.release_url = None  # url check for image file
         self.checksum = None  # Checksum Object
         self.metadata = None  # Metadata Object
+        self._sanitize()
+
+    def _sanitize(self) -> None:
+        """ Cleans up variables and sets defaults """
+        # Set filesearch to default: False
+        if "filesearch" not in self.release["checksum"]:
+            self.release["checksum"]["filesearch"] = False
 
     def is_update_available(self) -> bool:
         """ Checks Checksum Object. If Checksum Object indicates that checksum
@@ -39,7 +47,7 @@ class ImageUpdateBase:
             logger.debug("Creating Metadata since it was not created before")
             self.metadata = Metadata(
                 self.release, self.release_url, self.distribution_name,
-                self.checksum, self.description_base, self.codename
+                self.checksum, self.description_base
             )
             self.metadata.build_metadata(crawling)
         return self.metadata
@@ -51,9 +59,9 @@ class ImageUpdateChecker(ImageUpdateBase):
     """
     def __init__(
         self, source_name: str, image_description: str | list,
-        release: dict, last_checksum: str, codename: str
+        release: dict, last_checksum: str
     ) -> None:
-        super().__init__(source_name, image_description, release, codename)
+        super().__init__(source_name, image_description, release)
         self._setup_vars(last_checksum)
 
     def _setup_vars(self, last_checksum: str) -> None:
@@ -72,12 +80,16 @@ class ImageUpdateChecker(ImageUpdateBase):
             "latest" in self.release["image"]
             and self.release["image"]["latest"]
         ):
-            search_pattern = fr"{self.release['name']}"
+            search_pattern = get_latest_distribution_pattern(
+                self.release["latest_regex"]
+            )
+            logger.debug(f"search_pattern: {search_pattern}")
             links = url_fetch_links(self.release["baseURL"])
             while links:
                 link = links.pop()
                 extract = search_pattern.search(link)
                 if extract:
+                    logger.debug(f"link found: {link} with {extract}")
                     self.release_url = path.join(
                         self.release["baseURL"],
                         link,
@@ -85,34 +97,34 @@ class ImageUpdateChecker(ImageUpdateBase):
                     )
                     self.release["name"] == extract.group(1)
                     break
-            logger.warning(
-                f"No relese_url for {self.release['image']['distro']} found"
-            )
-            return None
+            if not extract:
+                logger.warning(
+                    f"No relese_url for {self.release['image']['distro']} found"
+                )
+                return None
         logger.debug(f"release_url: {self.release_url}")
-        if "filesearch" not in self.release["checksum"]:
-            self.release["checksum"]["filesearch"] = False
         self.checksum = Checksum(
             last_checksum, self.release_url, self.release["checksum"],
             self.release["image"]
         )
-        logger.debug("current checksum: {self.checksum.latest}")
+        logger.debug(f"current checksum: {self.checksum.latest}")
 
 
 class ImageUpdateCrawler(ImageUpdateBase):
     def __init__(
         self, source_name: str, image_description: str | list,
-        release: dict, codename: str, release_path: str
+        release: dict, release_path: str
     ) -> None:
-        super().__init__(source_name, image_description, release, codename)
+        super().__init__(source_name, image_description, release)
         self._setup_vars(release_path)
 
     def _setup_vars(self, release_path: str) -> None:
         self.release_url = release_path
         logger.debug(f"release_url: {self.release_url}")
+        # Set default filesearch to False
         old_checksum = f"{self.release['checksum']['algorithm']}:none"
         self.checksum = Checksum(
             old_checksum, self.release_url, self.release["checksum"],
             self.release["image"]
         )
-        logger.debug("current checksum: {self.checksum.latest}")
+        logger.debug(f"current checksum: {self.checksum.latest}")

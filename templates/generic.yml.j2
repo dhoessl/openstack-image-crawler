@@ -1,15 +1,16 @@
 ---
 images:
-{% for release in distribution -%}
+{%- for release in distribution %}
   - name: "{{ latest[release].release_name }}"
     shortname: "{{ latest[release].release_name |lower |replace(' ', '-') }}"
     format: "{{ distribution_config['releases'][0]['image']['extension'] |default('qcow2') }}"
     login: "{{ distribution_config['default_login'] |default(distribution_config['name'] |lower |replace(' ', '_')) }}"
-    min_disk: {{ distribution_config['min_disk'] |defalt(8) }}
+    min_disk: {{ distribution_config['min_disk'] |default(8) }}
     min_ram: {{ distribution_config['min_ram'] |default(512) }}
     status: "{{ distribution_config['image_status'] |default('active') }}"
     visibility: "{{ distribution_config['visibility'] |default('public') }}"
-    multi: {{ distribution_config['multi'] |default(true) }}
+    multi: {{ distribution_config['multi'] |default('true') }}
+    enable: {{ distribution_config['enable'] |default('true') }}
     tags: {{ distribution_config['tags'] |default([]) }}
     meta:
       architecture: "{{ latest[release].arch |default('x86_64') }}"
@@ -17,7 +18,7 @@ images:
       hw_disk_bus: "{{ distribution_config['hw_disk_bus'] |default('scsi') }}"
       hw_rng_model: "{{ distribution_config['hw_rng_model'] |default('virtio') }}"
       hw_scsi_model: "{{ distribution_config['hw_scsi_model'] |default('virtio-scsi') }}"
-      hw_qemu_guest_agent: {{ distribution_config['hw_qemu_guest_agent'] |default(true) }}
+      hw_qemu_guest_agent: {{ distribution_config['hw_qemu_guest_agent'] |default('yes') }}
       hw_watchdog_action: "{{ distribution_config['hw_watchdog_action'] |default('reset') }}"
       replace_frequency: "{{ distribution_config['replace_frequency'] |default('monthly') }}"
       hotfix_hours: "{{ distribution_config['hotfix_hours'] |default('0') }}"
@@ -28,13 +29,14 @@ images:
     latest_checksum_url: "{{ latest[release].checksum_url }}"
     latest_url: "{{ latest[release].url }}"
     versions:
-{% for version in distribution[release] -%}
+{%- for version in distribution[release] %}
       - version: "{{ version.version }}"
         url: "{{ version.url }}"
         checksum: "{{ version.checksum }}"
         build_date: "{{ version.release_date }}"
         image_source: "{{ version.url }}"
         image_description: "{{ version.description |default('') }}"
-{% endfor -%}
 {% endfor %}
+{%- endfor -%}
 ...
+

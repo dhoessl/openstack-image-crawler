@@ -60,7 +60,7 @@ class Exporter:
 
     def export_image_catalog(self) -> None:
         """ export just distributions with updates """
-        for distribution in self.image_source_catalog:
+        for distribution in self.image_source_catalog["sources"]:
             if distribution["name"] not in self.image_update_catalog:
                 # If there is no update for this distribution (source['name'])
                 # then skip it
@@ -69,13 +69,13 @@ class Exporter:
 
     def export_all_images(self) -> None:
         """ export all images. do not check if an update is available """
-        for distribution in self.image_source_catalog:
+        for distribution in self.image_source_catalog["sources"]:
             self.export_distribution(distribution["name"])
 
     def export_distribution(self, distribution_name: str) -> None:
         """ Creates yaml file for a specific distribution/image """
         logger.info(f"Start export of image catalog for {distribution_name}")
-        for distribution in self.image_source_catalog:
+        for distribution in self.image_source_catalog["sources"]:
             if distribution_name != distribution["name"]:
                 continue
             distribution_data = distribution
