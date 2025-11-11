@@ -58,7 +58,7 @@ def update_repository(
 
         untracked_files = image_repo.untracked_files
         if untracked_files:
-            logger.info("New untracked files:{'\n'.join(untracked_files)}")
+            logger.info(f"New untracked files:{'\n'.join(untracked_files)}")
             for file in untracked_files:
                 all_changes.append(file)
 
@@ -72,14 +72,14 @@ def update_repository(
         for source in updated_sources:
             for release in updated_sources[source]["releases"]:
                 logger.debug(f"get release version data for {source} {release}")
-                release_data = database.get_release_version(
+                release_data = database.get_release_versions(
                     source, release, 1
                 )
                 if not release_data:
                     logger.warn("got no release version data")
                     continue
                 releases_list.append(
-                    f"{release_data['name']} {release_data['version']}"
+                    f"{release_data[0].release_name} {release_data[0].version}"
                 )
 
         commit_message = f"Add releases: {', '.join(releases_list)}"

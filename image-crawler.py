@@ -122,7 +122,9 @@ def main() -> None:
             f"Please check your config at {args.config}"
         )
     # Check if database pragma is up to date
+    # If metadata missing for new columns it updated
     database.update()
+    database.check_column_data(image_source_catalog)
 
     if args.updates_only:
         # Only Update Sources and repository

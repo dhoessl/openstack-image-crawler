@@ -1,8 +1,12 @@
 # database.py
+
 import sqlite3
+
 from loguru import logger
 from os import path
+
 from crawler.updater.metadata import Metadata, MetadataBase
+from crawler.updater.update_check import ImageUpdateChecker
 
 
 class Database:
@@ -120,32 +124,6 @@ class Database:
             for row in rows:
                 checksum_list.append(row[0])
             return checksum_list
-
-    def get_last_checksum_by_version(
-        self, distribution: str, release: str, limit: int = 1
-    ) -> list:
-        query = (
-            "SELECT checksum, version FROM image_catalog "
-            "WHERE distribution_name = ? "
-            "AND distribution_release = ? "
-            "ORDER BY id DESC LIMIT ?"
-        )
-        params = (distribution, release, limit)
-        cursor = self.execute_query(query, params, False, "Checksum versions")
-        rows = cursor.fetchall()
-        cursor.close()
-        checksum_list = []
-        if not rows:
-            logger.debug(
-                "No previous Checksums found for {distribution} {release}"
-            )
-            return checksum_list
-        for row in rows:
-            checksum_list.append({
-                "checksum": row[0],
-                "version": row[1]
-            })
-        return checksum_list
 
     def get_release_versions(
         self, distribution: str, release: str, limit: int = 1
@@ -287,4 +265,58 @@ class Database:
             query = f"ALTER TABLE image_catalog ADD COLUMN {column} text"
             self.execute_query(query, commit=True, caller="Column Upgrade")
         logger.info("Table update finished")
-        # TODO: pull all releases and fill missing data
+
+    def check_column_data(self, image_source_catalog: dict) -> None:
+        """ Checks every release from source file and adds metadata if metadata
+            is missing after table upgrade
+        """
+        check_query = (
+            "SELECT checksum_url, arch, description "
+            "FROM image_catalog "
+            "WHERE distribution_name = ? "
+            "AND distribution_release = ? "
+            "ORDER BY id DESC LIMIT ?"
+        )
+        for source in image_source_catalog["sources"]:
+            for release in source["releases"]:
+                if "limit" not in release:
+                    release["limit"] = 3
+                params = (source["name"], release["name"], release["limit"])
+                cursor = self.execute_query(
+                    check_query, params, False, "Column data check"
+                )
+                release_info = cursor.fetchall()
+                update_entries = False
+                for row in release_info:
+                    if row[0] is None or row[1] is None or row[2] is None:
+                        update_entries = True
+                        break
+                if update_entries:
+                    self.update_column_data(source, release)
+
+    def update_column_data(self, source: dict, release: dict) -> None:
+        """ Fetches Metadata for release and updates data """
+        # Create a ImageUpdateChecker because it collects all required
+        # information and its already built in
+        update_checker = ImageUpdateChecker(
+            source["name"], source["description"], release, "none:none"
+        )
+        # do not check if update is available because at this point
+        # we dont mind if an update is available and just want to fetch
+        # metadata
+        metadata = update_checker.get_metadata()
+        update_query = (
+            "UPDATE image_catalog "
+            "SET checksum_url=?, arch=?, description=? "
+            "WHERE distribution_name = ? "
+            "AND distribution_release = ? "
+            "AND "
+            "(checksum_url is NULL OR arch is NULL OR description is NULL)"
+        )
+        params = (
+            metadata.checksum.url, metadata.arch, metadata.description,
+            source["name"], release["name"]
+        )
+        self.execute_query(
+            update_query, params, True, "Column data update"
+        )
