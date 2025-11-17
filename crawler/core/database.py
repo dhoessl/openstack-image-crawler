@@ -104,11 +104,15 @@ class Database:
         """ Fetches the last checksum from database for a given release """
         query = (
             "SELECT checksum FROM image_catalog "
-            "WHERE distribution_name = ? "
-            "AND distribution_release = ? "
-            "ORDER BY id DESC LIMIT ?"
+            "WHERE distribution_name = :distribution "
+            "AND distribution_release = :release "
+            "ORDER BY id DESC LIMIT :limit"
         )
-        params = (distribution, release, limit)
+        params = {
+            "distribution": distribution,
+            "release": release,
+            "limit": limit
+        }
         cursor = self.execute_query(query, params, False, "Checksum")
         rows = cursor.fetchall()
         cursor.close()
@@ -133,11 +137,15 @@ class Database:
             "distribution_release, url, checksum, checksum_url, arch, "
             "description "
             "FROM image_catalog "
-            "WHERE distribution_name = ? "
-            "AND distribution_release = ? "
-            "ORDER BY id DESC LIMIT ?"
+            "WHERE distribution_name = :distribution "
+            "AND distribution_release = :release "
+            "ORDER BY id DESC LIMIT :limit"
         )
-        params = (distribution, release, limit)
+        params = {
+            "distribution": distribution,
+            "release": release,
+            "limit": limit
+        }
         cursor = self.execute_query(query, params, False, "Release Versions")
         data = cursor.fetchall()
         cursor.close()
@@ -172,12 +180,17 @@ class Database:
         query = (
             "SELECT version, checksum, url, release_date "
             "FROM image_catalog "
-            "WHERE distribution_name = ? "
-            "AND distribution_release = ? "
-            "AND version = ? "
-            "ORDER BY id DESC LIMIT ?"
+            "WHERE distribution_name = :distribution "
+            "AND distribution_release = :release "
+            "AND version = :version "
+            "ORDER BY id DESC LIMIT :limit"
         )
-        params = (distribution, release, version, limit)
+        params = {
+            "distribution": distribution,
+            "release": release,
+            "version": version,
+            "limit": limit
+        }
         cursor = self.execute_query(query, params, False, "Version Catalog")
         data = cursor.fetchall()
         cursor.close()
@@ -204,27 +217,38 @@ class Database:
             "(name, release_date, version, distribution_name, "
             "distribution_release, url, checksum, checksum_url, arch, "
             "description) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "VALUES (:name, :release_date, :version, :distribution, :release, "
+            ":url, :checksum, :checksum_url, :arch, :description)"
         )
-        params = (
-            metadata.release_name, metadata.release_date, metadata.version,
-            metadata.distribution_name, metadata.distribution_release,
-            metadata.url, metadata.checksum.latest,
-            metadata.checksum.url, metadata.arch, metadata.description
-        )
+        params = {
+            "name": metadata.release_name,
+            "release_date": metadata.release_date,
+            "version": metadata.version,
+            "distribution": metadata.distribution_name,
+            "release": metadata.distribution_release,
+            "url": metadata.url,
+            "checksum": metadata.checksum.latest,
+            "checksum_url": metadata.checksum.url,
+            "arch": metadata.arch,
+            "description": metadata.description
+        }
         self.execute_query(query, params, commit=True, caller="write entry")
 
     def update_catalog_entry(self, metadata: Metadata) -> None:
         """ Updates existing entry with data from Metadata object """
         query = (
-            "UPDATE image_catalog set url=?, checksum=?, "
-            "release_date=?, checksum_url=? "
-            "WHERE name=? AND version=?"
+            "UPDATE image_catalog set url = :url, checksum = :checksum, "
+            "release_date = :release_date, checksum_url = :checksum_url "
+            "WHERE name = :name AND version = :version"
         )
-        params = (
-            metadata.url, metadata.checksum.latest, metadata.release_date,
-            metadata.checksum.url, metadata.release_name, metadata.version
-        )
+        params = {
+            "url": metadata.url,
+            "checksum": metadata.checksum.latest,
+            "release_date": metadata.release_date,
+            "checksum_url": metadata.checksum.url,
+            "name": metadata.release_name,
+            "version": metadata.version
+        }
         self.execute_query(query, params, commit=True, caller="update entry")
 
     def write_or_update_catalog_entry(self, metadata: Metadata) -> None:
@@ -273,15 +297,19 @@ class Database:
         check_query = (
             "SELECT checksum_url, arch, description "
             "FROM image_catalog "
-            "WHERE distribution_name = ? "
-            "AND distribution_release = ? "
-            "ORDER BY id DESC LIMIT ?"
+            "WHERE distribution_name = :distribution "
+            "AND distribution_release = :release "
+            "ORDER BY id DESC LIMIT :limit"
         )
         for source in image_source_catalog["sources"]:
             for release in source["releases"]:
                 if "limit" not in release:
                     release["limit"] = 3
-                params = (source["name"], release["name"], release["limit"])
+                params = {
+                    "distribution": source["name"],
+                    "release": release["name"],
+                    "limit": release["limit"]
+                }
                 cursor = self.execute_query(
                     check_query, params, False, "Column data check"
                 )
@@ -307,16 +335,20 @@ class Database:
         metadata = update_checker.get_metadata()
         update_query = (
             "UPDATE image_catalog "
-            "SET checksum_url=?, arch=?, description=? "
-            "WHERE distribution_name = ? "
-            "AND distribution_release = ? "
+            "SET checksum_url = :checksum_url, arch = :arch, "
+            "description = :description "
+            "WHERE distribution_name = :distribution "
+            "AND distribution_release = :release "
             "AND "
             "(checksum_url is NULL OR arch is NULL OR description is NULL)"
         )
-        params = (
-            metadata.checksum.url, metadata.arch, metadata.description,
-            source["name"], release["name"]
-        )
+        params = {
+            "checksum_url": metadata.checksum.url,
+            "arch": metadata.arch,
+            "description": metadata.description,
+            "distribution": source["name"],
+            "release": release["name"]
+        }
         self.execute_query(
             update_query, params, True, "Column data update"
         )
