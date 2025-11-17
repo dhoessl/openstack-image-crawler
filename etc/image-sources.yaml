@@ -41,6 +41,7 @@ sources:
       - "https://launchpad.net/ubuntu/"
       - "CODENAME"
       - "/+source/linux/+changelog"
+    os_purpose: "minimal"
     releases:
       - name: "22.04"
         codename: "jammy"

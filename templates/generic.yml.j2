@@ -26,6 +26,7 @@ images:
       provided_until: {{ distribution_config['provided_until'] |default('none') }}
       os_distro: "{{ latest[release].distribution_name |lower }}"
       os_version: "{{ latest[release].distribution_release }}"
+      os_purpose: "{{ distribution_config['os_purpose'] |default('generic') }}"
     latest_checksum_url: "{{ latest[release].checksum_url }}"
     latest_url: "{{ latest[release].url }}"
     versions:
